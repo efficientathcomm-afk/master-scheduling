@@ -59,10 +59,10 @@ const INITIAL_OPPONENTS = [
 ];
 
 const INITIAL_STAFF_ROLES = [
-  { id: 'sr-1', roleName: 'Game Announcer / PA', hourlyRate: 25, defaultHours: 4 },
-  { id: 'sr-2', roleName: 'Livestream Operator', hourlyRate: 22, defaultHours: 4 },
-  { id: 'sr-3', roleName: 'Ticket Taker / Usher', hourlyRate: 15, defaultHours: 3 },
-  { id: 'sr-4', roleName: 'Athletic Trainer', hourlyRate: 35, defaultHours: 5 }
+  { id: 'sr-1', roleName: 'Game Announcer / PA', rateType: 'hourly', rateValue: 25, defaultHours: 4 },
+  { id: 'sr-2', roleName: 'Livestream Operator', rateType: 'hourly', rateValue: 22, defaultHours: 4 },
+  { id: 'sr-3', roleName: 'Ticket Taker / Usher', rateType: 'flat', rateValue: 120, defaultHours: 3 },
+  { id: 'sr-4', roleName: 'Athletic Trainer', rateType: 'hourly', rateValue: 35, defaultHours: 5 }
 ];
 
 const INITIAL_TRANSPORT_MODES = [
@@ -70,6 +70,11 @@ const INITIAL_TRANSPORT_MODES = [
   { id: 'tm-2', modeName: 'Van Fleet', rateType: 'mileage', rateValue: 1.20 },
   { id: 'tm-3', modeName: 'Commercial Flight', rateType: 'flat', rateValue: 450 }
 ];
+
+const INITIAL_STUDENT_WORKER_SETTINGS = {
+  hourlyRate: 15.00,
+  prepAndTeardownMinutes: 90 // 1.5 hours total added to game length
+};
 
 const INITIAL_SCHEDULES = [
   {
@@ -112,9 +117,10 @@ export default function App() {
   const [sportConfigs, setSportConfigs] = useState(INITIAL_SPORT_CONFIGS);
   const [staffRoles, setStaffRoles] = useState(INITIAL_STAFF_ROLES);
   const [transportModes, setTransportModes] = useState(INITIAL_TRANSPORT_MODES);
+  const [studentWorkerConfig, setStudentWorkerConfig] = useState(INITIAL_STUDENT_WORKER_SETTINGS);
   
   const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'calendar', 'matrix', 'submit', 'venues', 'sports', 'opponents', 'budget', 'conflicts'
-  const [budgetSubTab, setBudgetSubTab] = useState('summary'); // 'summary', 'staffing', 'transport', 'sport-detail'
+  const [budgetSubTab, setBudgetSubTab] = useState('summary'); // 'summary', 'staffing', 'student-workers', 'transport', 'sport-detail'
   const [selectedSportDetail, setSelectedSportDetail] = useState(null);
   const [editingScheduleId, setEditingScheduleId] = useState(null);
 
@@ -125,7 +131,7 @@ export default function App() {
 
   const [showStaffModal, setShowStaffModal] = useState(false);
   const [editingStaffId, setEditingStaffId] = useState(null);
-  const [staffFormData, setStaffFormData] = useState({ roleName: '', hourlyRate: 18, defaultHours: 4 });
+  const [staffFormData, setStaffFormData] = useState({ roleName: '', rateType: 'hourly', rateValue: 18, defaultHours: 4 });
 
   const [showTransportModal, setShowTransportModal] = useState(false);
   const [transportFormData, setTransportFormData] = useState({ modeName: '', rateType: 'mileage', rateValue: 3.50 });
@@ -278,27 +284,38 @@ export default function App() {
       setFormData(prev => ({
         ...prev,
         sport: sportName,
-        venueId: config.defaultVenueId || 'v1',
+        venueId: config.defaultVenueId || prev.venueId,
         durationHours: config.defaultDuration || 2.5,
         warmupMinutes: config.warmupMinutes || 45,
-        teardownMinutes: config.locationType === 'Home' ? 0 : (config.teardownMinutes || 30),
-        travelPartySize: config.rosterSize || 30
+        teardownMinutes: config.teardownMinutes || 30
       }));
-    } else {
-      setFormData(prev => ({ ...prev, sport: sportName }));
     }
   };
 
-  const calculateCosts = (oppName, locType, overnight, partySize, sportName, tMode, roomsCount, hotelRate) => {
+  const calculateCosts = (oppName, locType, overnight, partySize, sportName, tMode, roomsCount, hotelRate, durationHrs) => {
     const oppObj = opponents.find(o => o.name === oppName);
-    const config = sportConfigs[sportName] || sportConfigs['Football'] || { officialsCost: 600, staffCost: 300 };
+    const config = sportConfigs[sportName] || sportConfigs['Football'] || { officialsCost: 600, staffCost: 300, studentStaffCount: 4 };
     const distance = oppObj ? oppObj.distance : 100;
     
-    let travel = 0, meals = 0, hotel = 0, hosting = 0;
+    let travel = 0, meals = 0, hotel = 0, hosting = 0, studentWorkerCost = 0;
     const isHome = locType === 'Home' || locType === 'Tournament';
 
     if (isHome) {
-      hosting = Number(config.officialsCost || 600) + Number(config.staffCost || 300);
+      // Officials + Staff Roles + Student Workers
+      let rolesHostingTotal = 0;
+      staffRoles.forEach(sr => {
+        if (sr.rateType === 'flat') {
+          rolesHostingTotal += Number(sr.rateValue || 0);
+        } else {
+          rolesHostingTotal += Number(sr.rateValue || 0) * Number(sr.defaultHours || 4);
+        }
+      });
+
+      const totalGameHours = Number(durationHrs || 2.5) + (Number(studentWorkerConfig.prepAndTeardownMinutes || 90) / 60);
+      const studentWorkersTotal = Number(config.studentStaffCount || 4) * Number(studentWorkerConfig.hourlyRate || 15) * totalGameHours;
+
+      hosting = Number(config.officialsCost || 600) + rolesHostingTotal + studentWorkersTotal;
+      studentWorkerCost = studentWorkersTotal;
     } else {
       const transportModeObj = transportModes.find(tm => tm.modeName === tMode);
       const rateVal = transportModeObj ? transportModeObj.rateValue : 4.50;
@@ -316,7 +333,7 @@ export default function App() {
       meals = partySize * 45 * (overnight ? 3 : 1);
       hotel = overnight ? roomsCount * hotelRate * 1 : 0;
     }
-    return { travel, meals, hotel, hosting };
+    return { travel, meals, hotel, hosting, studentWorkerCost };
   };
 
   const handleOpponentOrTripChange = (updates) => {
@@ -329,14 +346,16 @@ export default function App() {
       nextData.sport, 
       nextData.travelMode,
       nextData.hotelRoomsCount,
-      nextData.customHotelCostPerNight
+      nextData.customHotelCostPerNight,
+      nextData.durationHours
     );
     setFormData({
       ...nextData,
       travelCost: costs.travel,
       mealCost: costs.meals,
       hotelCost: costs.hotel,
-      hostingCost: costs.hosting
+      hostingCost: costs.hosting,
+      studentWorkerCost: costs.studentWorkerCost
     });
   };
 
@@ -512,7 +531,7 @@ export default function App() {
     }
     setShowStaffModal(false);
     setEditingStaffId(null);
-    setStaffFormData({ roleName: '', hourlyRate: 18, defaultHours: 4 });
+    setStaffFormData({ roleName: '', rateType: 'hourly', rateValue: 18, defaultHours: 4 });
   };
 
   const handleDeleteStaffRole = (id) => {
@@ -707,7 +726,7 @@ export default function App() {
   };
 
   const budgetSummary = useMemo(() => {
-    let totalTravel = 0, totalMeals = 0, totalHotel = 0, totalHosting = 0;
+    let totalTravel = 0, totalMeals = 0, totalHotel = 0, totalHosting = 0, totalStudentWorkers = 0;
     const bySport = {};
 
     schedules.forEach(s => {
@@ -716,28 +735,36 @@ export default function App() {
       const m = Number(s.mealCost || 0);
       const h = Number(s.hotelCost || 0);
       const host = Number(s.hostingCost || 0);
+      
+      const config = sportConfigs[s.sport] || {};
+      const isHome = s.locationType === 'Home' || s.locationType === 'Tournament';
+      const swCost = isHome ? (Number(config.studentStaffCount || 4) * Number(studentWorkerConfig.hourlyRate || 15) * (Number(s.durationHours || 2.5) + (Number(studentWorkerConfig.prepAndTeardownMinutes || 90) / 60))) : 0;
 
       totalTravel += t;
       totalMeals += m;
       totalHotel += h;
       totalHosting += host;
+      totalStudentWorkers += swCost;
 
       if (!bySport[s.sport]) {
-        bySport[s.sport] = { travel: 0, meals: 0, hotel: 0, hosting: 0, count: 0 };
+        bySport[s.sport] = { travel: 0, meals: 0, hotel: 0, hosting: 0, studentWorkers: 0, count: 0 };
       }
       bySport[s.sport].travel += t;
       bySport[s.sport].meals += m;
       bySport[s.sport].hotel += h;
       bySport[s.sport].hosting += host;
+      bySport[s.sport].studentWorkers += swCost;
       bySport[s.sport].count += 1;
     });
 
     const grandTotal = totalTravel + totalMeals + totalHotel + totalHosting;
-    return { totalTravel, totalMeals, totalHotel, totalHosting, grandTotal, bySport };
-  }, [schedules]);
+    return { totalTravel, totalMeals, totalHotel, totalHosting, totalStudentWorkers, grandTotal, bySport };
+  }, [schedules, studentWorkerConfig, sportConfigs]);
 
   const displayedSchedules = useMemo(() => {
-    if (role === 'coach') return schedules.filter(s => s.sport === currentUserSport);
+    if (role === 'coach') {
+      return schedules.filter(s => s.sport === currentUserSport);
+    }
     return schedules;
   }, [schedules, role, currentUserSport]);
 
@@ -832,14 +859,23 @@ export default function App() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Hourly Rate ($)</label>
-                  <input type="number" step="0.5" value={staffFormData.hourlyRate} onChange={(e) => setStaffFormData({...staffFormData, hourlyRate: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">Rate Type</label>
+                  <select value={staffFormData.rateType} onChange={(e) => setStaffFormData({...staffFormData, rateType: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
+                    <option value="hourly">Hourly ($/hr)</option>
+                    <option value="flat">Flat Rate ($)</option>
+                  </select>
                 </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">Rate Value ($)</label>
+                  <input type="number" step="0.5" value={staffFormData.rateValue} onChange={(e) => setStaffFormData({...staffFormData, rateValue: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                </div>
+              </div>
+              {staffFormData.rateType === 'hourly' && (
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 mb-1">Default Hours / Game</label>
                   <input type="number" step="0.5" value={staffFormData.defaultHours} onChange={(e) => setStaffFormData({...staffFormData, defaultHours: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
                 </div>
-              </div>
+              )}
               <div className="flex justify-end space-x-3 pt-3">
                 <button type="button" onClick={() => { setShowStaffModal(false); setEditingStaffId(null); }} className="px-4 py-2 text-xs text-slate-400">Cancel</button>
                 <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold">{editingStaffId ? 'Update Role' : 'Save Role'}</button>
@@ -1503,11 +1539,12 @@ export default function App() {
               <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div>
                   <h3 className={`text-base font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Budget, Staffing & Transportation Control</h3>
-                  <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'} mt-0.5`}>Comprehensive financial models, home staffing rates, and transportation options.</p>
+                  <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'} mt-0.5`}>Comprehensive financial models, home staffing rates, student workers, and transportation options.</p>
                 </div>
-                <div className="flex bg-slate-900 border border-slate-800 p-1 rounded-xl text-xs">
+                <div className="flex bg-slate-900 border border-slate-800 p-1 rounded-xl text-xs flex-wrap gap-1">
                   <button onClick={() => { setBudgetSubTab('summary'); setSelectedSportDetail(null); }} className={`px-3 py-1.5 rounded-lg font-medium transition-all ${budgetSubTab === 'summary' && !selectedSportDetail ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}>Sport Summary</button>
                   <button onClick={() => setBudgetSubTab('staffing')} className={`px-3 py-1.5 rounded-lg font-medium transition-all ${budgetSubTab === 'staffing' ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}>Home Staffing</button>
+                  <button onClick={() => setBudgetSubTab('student-workers')} className={`px-3 py-1.5 rounded-lg font-medium transition-all ${budgetSubTab === 'student-workers' ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}>Student Workers</button>
                   <button onClick={() => setBudgetSubTab('transport')} className={`px-3 py-1.5 rounded-lg font-medium transition-all ${budgetSubTab === 'transport' ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}>Transportation</button>
                 </div>
               </div>
@@ -1552,22 +1589,26 @@ export default function App() {
                 </div>
               ) : budgetSubTab === 'summary' ? (
                 <>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border p-5 rounded-2xl`}>
+                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                    <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border p-4 rounded-2xl`}>
                       <p className="text-xs text-slate-400">Transportation</p>
-                      <h3 className="text-xl font-bold text-indigo-400 mt-1">${budgetSummary.totalTravel.toLocaleString()}</h3>
+                      <h3 className="text-lg font-bold text-indigo-400 mt-1">${budgetSummary.totalTravel.toLocaleString()}</h3>
                     </div>
-                    <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border p-5 rounded-2xl`}>
+                    <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border p-4 rounded-2xl`}>
                       <p className="text-xs text-slate-400">Lodging (Hotel)</p>
-                      <h3 className="text-xl font-bold text-amber-400 mt-1">${budgetSummary.totalHotel.toLocaleString()}</h3>
+                      <h3 className="text-lg font-bold text-amber-400 mt-1">${budgetSummary.totalHotel.toLocaleString()}</h3>
                     </div>
-                    <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border p-5 rounded-2xl`}>
+                    <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border p-4 rounded-2xl`}>
                       <p className="text-xs text-slate-400">Per Diem Meals</p>
-                      <h3 className="text-xl font-bold text-emerald-400 mt-1">${budgetSummary.totalMeals.toLocaleString()}</h3>
+                      <h3 className="text-lg font-bold text-emerald-400 mt-1">${budgetSummary.totalMeals.toLocaleString()}</h3>
                     </div>
-                    <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border p-5 rounded-2xl`}>
-                      <p className="text-xs text-slate-400">Hosting & Officials</p>
-                      <h3 className="text-xl font-bold text-purple-400 mt-1">${budgetSummary.totalHosting.toLocaleString()}</h3>
+                    <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border p-4 rounded-2xl`}>
+                      <p className="text-xs text-slate-400">Student Workers</p>
+                      <h3 className="text-lg font-bold text-blue-400 mt-1">${budgetSummary.totalStudentWorkers.toLocaleString()}</h3>
+                    </div>
+                    <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border p-4 rounded-2xl`}>
+                      <p className="text-xs text-slate-400">Officials & Staff</p>
+                      <h3 className="text-lg font-bold text-purple-400 mt-1">${budgetSummary.totalHosting.toLocaleString()}</h3>
                     </div>
                   </div>
 
@@ -1583,13 +1624,14 @@ export default function App() {
                             <th className="pb-3 font-semibold">Travel</th>
                             <th className="pb-3 font-semibold">Hotel</th>
                             <th className="pb-3 font-semibold">Meals</th>
-                            <th className="pb-3 font-semibold">Hosting</th>
+                            <th className="pb-3 font-semibold">Student Wk</th>
+                            <th className="pb-3 font-semibold">Hosting/Other</th>
                             <th className="pb-3 font-semibold text-right">Total</th>
                           </tr>
                         </thead>
                         <tbody className={`divide-y ${darkMode ? 'divide-slate-900' : 'divide-slate-200'}`}>
                           {Object.entries(budgetSummary.bySport).map(([sport, b]) => {
-                            const subTotal = b.travel + b.meals + b.hotel + b.hosting;
+                            const subTotal = b.travel + b.meals + b.hotel + b.hosting + b.studentWorkers;
                             return (
                               <tr key={sport} onClick={() => setSelectedSportDetail(sport)} className="cursor-pointer hover:bg-indigo-600/10 transition-colors">
                                 <td className={`py-3 font-bold text-indigo-400 flex items-center gap-1.5`}>{sport} <ChevronRight className="w-3 h-3"/></td>
@@ -1597,6 +1639,7 @@ export default function App() {
                                 <td className="py-3 text-slate-400">${b.travel.toLocaleString()}</td>
                                 <td className="py-3 text-slate-400">${b.hotel.toLocaleString()}</td>
                                 <td className="py-3 text-slate-400">${b.meals.toLocaleString()}</td>
+                                <td className="py-3 text-slate-400">${b.studentWorkers.toLocaleString()}</td>
                                 <td className="py-3 text-slate-400">${b.hosting.toLocaleString()}</td>
                                 <td className="py-3 text-right font-bold text-emerald-400">${subTotal.toLocaleString()}</td>
                               </tr>
@@ -1612,9 +1655,9 @@ export default function App() {
                   <div className="flex items-center justify-between">
                     <div>
                       <h4 className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Home Game Staffing Roles & Pay Rates</h4>
-                      <p className="text-xs text-slate-400">Define student worker and support staff hourly rates to calculate hosting expenses.</p>
+                      <p className="text-xs text-slate-400">Define support staff flat or hourly rates to calculate hosting expenses.</p>
                     </div>
-                    <button onClick={() => { setEditingStaffId(null); setStaffFormData({ roleName: '', hourlyRate: 18, defaultHours: 4 }); setShowStaffModal(true); }} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow">
+                    <button onClick={() => { setEditingStaffId(null); setStaffFormData({ roleName: '', rateType: 'hourly', rateValue: 18, defaultHours: 4 }); setShowStaffModal(true); }} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow">
                       <Plus className="w-4 h-4"/> Add Staff Role
                     </button>
                   </div>
@@ -1623,9 +1666,9 @@ export default function App() {
                       <thead>
                         <tr className={`border-b ${darkMode ? 'border-slate-800 text-slate-400' : 'border-slate-200 text-slate-600'}`}>
                           <th className="pb-3 font-semibold">Staff Role</th>
-                          <th className="pb-3 font-semibold">Hourly Rate</th>
+                          <th className="pb-3 font-semibold">Rate Type</th>
+                          <th className="pb-3 font-semibold">Rate Value</th>
                           <th className="pb-3 font-semibold">Default Duration</th>
-                          <th className="pb-3 font-semibold">Est. Cost / Game</th>
                           <th className="pb-3 font-semibold text-right">Actions</th>
                         </tr>
                       </thead>
@@ -1633,17 +1676,37 @@ export default function App() {
                         {staffRoles.map(sr => (
                           <tr key={sr.id}>
                             <td className={`py-3 font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{sr.roleName}</td>
-                            <td className="py-3 text-slate-400">${sr.hourlyRate.toFixed(2)} / hr</td>
-                            <td className="py-3 text-slate-400">{sr.defaultHours} hours</td>
-                            <td className="py-3 font-bold text-emerald-400">${(sr.hourlyRate * sr.defaultHours).toFixed(2)}</td>
+                            <td className="py-3 text-slate-400 uppercase text-[10px] font-semibold">{sr.rateType}</td>
+                            <td className="py-3 text-slate-400">
+                              {sr.rateType === 'flat' ? `$${sr.rateValue.toFixed(2)} flat` : `$${sr.rateValue.toFixed(2)} / hr`}
+                            </td>
+                            <td className="py-3 text-slate-400">{sr.rateType === 'hourly' ? `${sr.defaultHours} hours` : 'N/A'}</td>
                             <td className="py-3 text-right space-x-2">
-                              <button onClick={() => { setEditingStaffId(sr.id); setStaffFormData({ roleName: sr.roleName, hourlyRate: sr.hourlyRate, defaultHours: sr.defaultHours }); setShowStaffModal(true); }} className={`px-2.5 py-1 ${darkMode ? 'bg-slate-900 text-slate-300' : 'bg-slate-200 text-slate-800 font-semibold'} rounded-lg`}>Edit</button>
+                              <button onClick={() => { setEditingStaffId(sr.id); setStaffFormData({ roleName: sr.roleName, rateType: sr.rateType || 'hourly', rateValue: sr.rateValue, defaultHours: sr.defaultHours }); setShowStaffModal(true); }} className={`px-2.5 py-1 ${darkMode ? 'bg-slate-900 text-slate-300' : 'bg-slate-200 text-slate-800 font-semibold'} rounded-lg`}>Edit</button>
                               <button onClick={() => handleDeleteStaffRole(sr.id)} className="px-2.5 py-1 bg-rose-600/20 text-rose-400 rounded-lg">Remove</button>
                             </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
+                  </div>
+                </div>
+              ) : budgetSubTab === 'student-workers' ? (
+                <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border rounded-2xl p-6 space-y-4 max-w-xl`}>
+                  <div>
+                    <h4 className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Student Worker Department Settings</h4>
+                    <p className="text-xs text-slate-400 mt-0.5">Configure global hourly rate and pre/post-game prep time added to game durations.</p>
+                  </div>
+                  <div className="space-y-4 pt-2">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1">Student Worker Hourly Rate ($)</label>
+                      <input type="number" step="0.25" value={studentWorkerConfig.hourlyRate} onChange={(e) => setStudentWorkerConfig({...studentWorkerConfig, hourlyRate: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1">Prep & Teardown Additional Time (Minutes)</label>
+                      <input type="number" value={studentWorkerConfig.prepAndTeardownMinutes} onChange={(e) => setStudentWorkerConfig({...studentWorkerConfig, prepAndTeardownMinutes: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="e.g. 90 minutes" />
+                      <p className="text-[10px] text-slate-500 mt-1">This time is automatically added to each sport's contest length for total student worker payroll calculation.</p>
+                    </div>
                   </div>
                 </div>
               ) : (
