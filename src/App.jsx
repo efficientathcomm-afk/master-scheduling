@@ -156,6 +156,7 @@ export default function App() {
   useEffect(() => {
     if (!user) return;
 
+    // RULE 1 Strict Paths for public data
     const eventsRef = collection(db, 'artifacts', appId, 'public', 'data', 'events');
     const opponentsRef = collection(db, 'artifacts', appId, 'public', 'data', 'opponents');
     const venuesRef = collection(db, 'artifacts', appId, 'public', 'data', 'venues');
@@ -168,11 +169,13 @@ export default function App() {
         snapshot.forEach(d => loaded.push({ id: d.id, ...d.data() }));
         if (loaded.length > 0) setSchedules(loaded);
         else {
-          INITIAL_SCHEDULES.forEach(async (init) => await addDoc(eventsRef, init));
+          INITIAL_SCHEDULES.forEach(async (init) => {
+            try { await addDoc(eventsRef, init); } catch (e) { console.error(e); }
+          });
         }
         setSyncStatus('Synced');
       },
-      (err) => { console.error(err); setSyncStatus('Sync Error'); }
+      (err) => { console.error("Events listener error:", err); setSyncStatus('Permission / Sync Error'); }
     );
 
     const unsubscribeOpponents = onSnapshot(opponentsRef, 
@@ -181,9 +184,12 @@ export default function App() {
         snapshot.forEach(d => loaded.push({ id: d.id, ...d.data() }));
         if (loaded.length > 0) setOpponents(loaded);
         else {
-          INITIAL_OPPONENTS.forEach(async (init) => await addDoc(opponentsRef, init));
+          INITIAL_OPPONENTS.forEach(async (init) => {
+            try { await addDoc(opponentsRef, init); } catch (e) { console.error(e); }
+          });
         }
-      }
+      },
+      (err) => { console.error("Opponents listener error:", err); }
     );
 
     const unsubscribeVenues = onSnapshot(venuesRef, 
@@ -192,9 +198,12 @@ export default function App() {
         snapshot.forEach(d => loaded.push({ id: d.id, ...d.data() }));
         if (loaded.length > 0) setVenues(loaded);
         else {
-          INITIAL_VENUES.forEach(async (init) => await addDoc(venuesRef, init));
+          INITIAL_VENUES.forEach(async (init) => {
+            try { await addDoc(venuesRef, init); } catch (e) { console.error(e); }
+          });
         }
-      }
+      },
+      (err) => { console.error("Venues listener error:", err); }
     );
 
     return () => {
