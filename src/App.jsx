@@ -134,7 +134,7 @@ export default function App() {
 
   const [notification, setNotification] = useState(null);
 
-  // --- 1. FIREBASE AUTHENTICATION ---
+  // --- 1. FIREBASE AUTHENTICATION (Awaited before listeners) ---
   useEffect(() => {
     const initAuth = async () => {
       try {
@@ -143,12 +143,16 @@ export default function App() {
         } else {
           await signInAnonymously(auth);
         }
+        setUser(auth.currentUser);
       } catch (err) {
         console.error("Auth error:", err);
+        setSyncStatus('Auth Error');
       }
     };
     initAuth();
-    const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+    });
     return () => unsubscribe();
   }, []);
 
