@@ -86,6 +86,7 @@ const INITIAL_SCHEDULES = [
 
 export default function App() {
   const [user, setUser] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
   const [syncStatus, setSyncStatus] = useState('Connecting...');
 
   // Application State
@@ -134,7 +135,7 @@ export default function App() {
 
   const [notification, setNotification] = useState(null);
 
-  // --- 1. FIREBASE AUTHENTICATION (Awaited before listeners) ---
+  // --- 1. STRICT AUTHENTICATION INITIALIZATION ---
   useEffect(() => {
     const initAuth = async () => {
       try {
@@ -144,21 +145,18 @@ export default function App() {
           await signInAnonymously(auth);
         }
         setUser(auth.currentUser);
+        setAuthReady(true);
       } catch (err) {
         console.error("Auth error:", err);
         setSyncStatus('Auth Error');
       }
     };
     initAuth();
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-    });
-    return () => unsubscribe();
   }, []);
 
-  // --- 2. FIRESTORE REAL-TIME SYNC ---
+  // --- 2. FIRESTORE REAL-TIME SYNC (Guarded by authReady) ---
   useEffect(() => {
-    if (!user) return;
+    if (!authReady) return;
 
     // RULE 1 Strict Paths for public data
     const eventsRef = collection(db, 'artifacts', appId, 'public', 'data', 'events');
@@ -215,7 +213,7 @@ export default function App() {
       unsubscribeOpponents();
       unsubscribeVenues();
     };
-  }, [user]);
+  }, [authReady]);
 
   const showNotice = (msg, type = 'success') => {
     setNotification({ msg, type });
@@ -286,7 +284,7 @@ export default function App() {
   // Add/Edit Venue Handlers
   const handleSaveVenue = async (e) => {
     e.preventDefault();
-    if (!user) return;
+    if (!authReady) return;
     try {
       const venuesRef = collection(db, 'artifacts', appId, 'public', 'data', 'venues');
       if (editingVenue) {
@@ -318,7 +316,7 @@ export default function App() {
   // Add Opponent Handler
   const handleAddOpponentSubmit = async (e) => {
     e.preventDefault();
-    if (!newOpponentData.name || !user) return;
+    if (!newOpponentData.name || !authReady) return;
     try {
       const opponentsRef = collection(db, 'artifacts', appId, 'public', 'data', 'opponents');
       await addDoc(opponentsRef, newOpponentData);
@@ -374,7 +372,7 @@ export default function App() {
   // Submit Schedule Entry (Fixed to Firestore)
   const handleScheduleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.opponent || !formData.date || !user) {
+    if (!formData.opponent || !formData.date || !authReady) {
       showNotice('Please complete required fields.', 'error');
       return;
     }
@@ -434,7 +432,7 @@ export default function App() {
 
   const handleRequestChangeSubmit = async (e) => {
     e.preventDefault();
-    if (!selectedScheduleForChange || !changeRequestReason || !user) return;
+    if (!selectedScheduleForChange || !changeRequestReason || !authReady) return;
     try {
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', selectedScheduleForChange.id), {
         status: 'Change Requested',
