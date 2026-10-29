@@ -51,11 +51,24 @@ const INITIAL_SPORT_CONFIGS = {
 };
 
 const INITIAL_OPPONENTS = [
-  { id: 'opp-1', name: 'State Tech University', location: 'State Tech, PA', distance: 140, isConference: true },
-  { id: 'opp-2', name: 'Coastal College', location: 'Coastal, NC', distance: 450, isConference: false },
-  { id: 'opp-3', name: 'Metro State University', location: 'Metro, NY', distance: 80, isConference: true },
-  { id: 'opp-4', name: 'Northern Polytechnic', location: 'North, MA', distance: 620, isConference: false },
-  { id: 'opp-5', name: 'Cascade Valley College', location: 'Cascade, VT', distance: 210, isConference: true }
+  { id: 'opp-1', name: 'State Tech University', location: 'State Tech, PA', distance: 140, travelTime: '2h 15m', isConference: true },
+  { id: 'opp-2', name: 'Coastal College', location: 'Coastal, NC', distance: 450, travelTime: '7h 30m', isConference: false },
+  { id: 'opp-3', name: 'Metro State University', location: 'Metro, NY', distance: 80, travelTime: '1h 30m', isConference: true },
+  { id: 'opp-4', name: 'Northern Polytechnic', location: 'North, MA', distance: 620, travelTime: '10h 0m', isConference: false },
+  { id: 'opp-5', name: 'Cascade Valley College', location: 'Cascade, VT', distance: 210, travelTime: '3h 45m', isConference: true }
+];
+
+const INITIAL_STAFF_ROLES = [
+  { id: 'sr-1', roleName: 'Game Announcer / PA', hourlyRate: 25, defaultHours: 4 },
+  { id: 'sr-2', roleName: 'Livestream Operator', hourlyRate: 22, defaultHours: 4 },
+  { id: 'sr-3', roleName: 'Ticket Taker / Usher', hourlyRate: 15, defaultHours: 3 },
+  { id: 'sr-4', roleName: 'Athletic Trainer', hourlyRate: 35, defaultHours: 5 }
+];
+
+const INITIAL_TRANSPORT_MODES = [
+  { id: 'tm-1', modeName: 'Charter Bus', rateType: 'mileage', rateValue: 4.50 },
+  { id: 'tm-2', modeName: 'Van Fleet', rateType: 'mileage', rateValue: 1.20 },
+  { id: 'tm-3', modeName: 'Commercial Flight', rateType: 'flat', rateValue: 450 }
 ];
 
 const INITIAL_SCHEDULES = [
@@ -97,12 +110,22 @@ export default function App() {
   const [venues, setVenues] = useState(INITIAL_VENUES);
   const [opponents, setOpponents] = useState(INITIAL_OPPONENTS);
   const [sportConfigs, setSportConfigs] = useState(INITIAL_SPORT_CONFIGS);
+  const [staffRoles, setStaffRoles] = useState(INITIAL_STAFF_ROLES);
+  const [transportModes, setTransportModes] = useState(INITIAL_TRANSPORT_MODES);
   
   const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'calendar', 'matrix', 'submit', 'venues', 'sports', 'opponents', 'budget', 'conflicts'
-  
+  const [budgetSubTab, setBudgetSubTab] = useState('summary'); // 'summary', 'staffing', 'transport', 'sport-detail'
+  const [selectedSportDetail, setSelectedSportDetail] = useState(null);
+
   // Modals
   const [showOpponentModal, setShowOpponentModal] = useState(false);
-  const [newOpponentData, setNewOpponentData] = useState({ name: '', location: '', distance: 100, isConference: true });
+  const [newOpponentData, setNewOpponentData] = useState({ name: '', location: '', distance: 100, travelTime: '2h 0m', isConference: true });
+
+  const [showStaffModal, setShowStaffModal] = useState(false);
+  const [staffFormData, setStaffFormData] = useState({ roleName: '', hourlyRate: 18, defaultHours: 4 });
+
+  const [showTransportModal, setShowTransportModal] = useState(false);
+  const [transportFormData, setTransportFormData] = useState({ modeName: '', rateType: 'mileage', rateValue: 3.50 });
 
   const [showVenueModal, setShowVenueModal] = useState(false);
   const [editingVenue, setEditingVenue] = useState(null);
@@ -356,8 +379,86 @@ export default function App() {
     } catch (e) {}
     setOpponents([...opponents, oppPayload]);
     setShowOpponentModal(false);
-    setNewOpponentData({ name: '', location: '', distance: 100, isConference: true });
+    setNewOpponentData({ name: '', location: '', distance: 100, travelTime: '2h 0m', isConference: true });
     showNotice(`Opponent "${newOpponentData.name}" added.`);
+  };
+
+  const handleSaveStaffRole = (e) => {
+    e.preventDefault();
+    if (!staffFormData.roleName) return;
+    const newRole = { id: 'sr-' + Date.now(), ...staffFormData };
+    setStaffRoles([...staffRoles, newRole]);
+    setShowStaffModal(false);
+    setStaffFormData({ roleName: '', hourlyRate: 18, defaultHours: 4 });
+    showNotice('Staff role added.');
+  };
+
+  const handleSaveTransportMode = (e) => {
+    e.preventDefault();
+    if (!transportFormData.modeName) return;
+    const newMode = { id: 'tm-' + Date.now(), ...transportFormData };
+    setTransportModes([...transportModes, newMode]);
+    setShowTransportModal(false);
+    setTransportFormData({ modeName: '', rateType: 'mileage', rateValue: 3.50 });
+    showNotice('Transportation mode added.');
+  };
+
+  const handleCSVImport = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const text = event.target.result;
+        const lines = text.split('\n');
+        let importedCount = 0;
+        const newEvents = [];
+        
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line) continue;
+          const [sport, opponent, locationType, venueName, date, time, notes] = line.split(',').map(s => s ? s.trim() : '');
+          if (sport && opponent && date) {
+            const venue = venues.find(v => v.name.toLowerCase() === (venueName || '').toLowerCase()) || venues[0];
+            const eventObj = {
+              id: 'imp-' + Date.now() + '-' + i,
+              sport: sport || 'Football',
+              coachName: 'Imported Schedule',
+              opponent: opponent || 'Opponent',
+              locationType: locationType || 'Home',
+              venueId: venue?.id || 'v1',
+              venueName: venue?.name || 'Alumni Memorial Stadium',
+              date: date || '2026-09-01',
+              time: time || '14:00',
+              durationHours: 2.5,
+              warmupMinutes: 45,
+              teardownMinutes: 30,
+              travelCost: 0,
+              mealCost: 0,
+              hotelCost: 0,
+              hostingCost: 2500,
+              overnightTravel: false,
+              travelPartySize: 30,
+              travelMode: 'Charter Bus',
+              status: 'Approved',
+              notes: notes || 'Imported via CSV'
+            };
+            newEvents.push(eventObj);
+            importedCount++;
+          }
+        }
+        
+        if (importedCount > 0) {
+          setSchedules(prev => [...prev, ...newEvents]);
+          showNotice(`Successfully imported ${importedCount} schedule events.`);
+        } else {
+          showNotice('No valid rows found in CSV. Format: Sport,Opponent,LocationType,VenueName,Date,Time,Notes', 'error');
+        }
+      } catch (err) {
+        showNotice('Failed to parse CSV file.', 'error');
+      }
+    };
+    reader.readAsText(file);
   };
 
   const checkConflictsForEvent = (newEvent, existingList, ignoreId = null) => {
@@ -558,6 +659,10 @@ export default function App() {
                   <input type="number" value={newOpponentData.distance} onChange={(e) => setNewOpponentData({...newOpponentData, distance: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
                 </div>
               </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">Travel Time Estimate</label>
+                <input type="text" value={newOpponentData.travelTime} onChange={(e) => setNewOpponentData({...newOpponentData, travelTime: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="e.g. 3h 15m" />
+              </div>
               <div className="flex items-center space-x-2 pt-2">
                 <input type="checkbox" id="isConference" checked={newOpponentData.isConference} onChange={(e) => setNewOpponentData({...newOpponentData, isConference: e.target.checked})} className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4" />
                 <label htmlFor="isConference" className="text-xs">Conference Opponent (Yes/No Check)</label>
@@ -565,6 +670,68 @@ export default function App() {
               <div className="flex justify-end space-x-3 pt-4">
                 <button type="button" onClick={() => setShowOpponentModal(false)} className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white">Cancel</button>
                 <button type="submit" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold">Save Opponent</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Staff Role Modal */}
+      {showStaffModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className={`${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-2xl max-w-md w-full p-6 shadow-2xl`}>
+            <h3 className="text-lg font-bold mb-3">Add Home Staffing Role</h3>
+            <form onSubmit={handleSaveStaffRole} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">Role Title</label>
+                <input type="text" required value={staffFormData.roleName} onChange={(e) => setStaffFormData({...staffFormData, roleName: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="e.g. Statisticians" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">Hourly Rate ($)</label>
+                  <input type="number" step="0.5" value={staffFormData.hourlyRate} onChange={(e) => setStaffFormData({...staffFormData, hourlyRate: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">Default Hours / Game</label>
+                  <input type="number" step="0.5" value={staffFormData.defaultHours} onChange={(e) => setStaffFormData({...staffFormData, defaultHours: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                </div>
+              </div>
+              <div className="flex justify-end space-x-3 pt-3">
+                <button type="button" onClick={() => setShowStaffModal(false)} className="px-4 py-2 text-xs text-slate-400">Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold">Save Role</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Transport Modal */}
+      {showTransportModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className={`${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-2xl max-w-md w-full p-6 shadow-2xl`}>
+            <h3 className="text-lg font-bold mb-3">Add Transportation Option</h3>
+            <form onSubmit={handleSaveTransportMode} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">Transport Mode Name</label>
+                <input type="text" required value={transportFormData.modeName} onChange={(e) => setTransportFormData({...transportFormData, modeName: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="e.g. Luxury Motorcoach" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">Rate Type</label>
+                  <select value={transportFormData.rateType} onChange={(e) => setTransportFormData({...transportFormData, rateType: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
+                    <option value="mileage">Mileage ($/mi)</option>
+                    <option value="hourly">Hourly ($/hr)</option>
+                    <option value="flat">Flat Rate ($)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">Rate Value</label>
+                  <input type="number" step="0.05" value={transportFormData.rateValue} onChange={(e) => setTransportFormData({...transportFormData, rateValue: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                </div>
+              </div>
+              <div className="flex justify-end space-x-3 pt-3">
+                <button type="button" onClick={() => setShowTransportModal(false)} className="px-4 py-2 text-xs text-slate-400">Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold">Save Mode</button>
               </div>
             </form>
           </div>
@@ -1117,7 +1284,7 @@ export default function App() {
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className={`text-base font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Master Opponent Directory</h3>
-                  <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'} mt-0.5`}>Manage opponent institutions, travel distances, and conference affiliations.</p>
+                  <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'} mt-0.5`}>Manage opponent institutions, travel distances, travel times, and conference affiliations.</p>
                 </div>
                 <button onClick={() => setShowOpponentModal(true)} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow">
                   <Plus className="w-4 h-4"/> Add Opponent
@@ -1131,7 +1298,8 @@ export default function App() {
                       <tr className={`border-b ${darkMode ? 'border-slate-800 text-slate-400' : 'border-slate-200 text-slate-600'}`}>
                         <th className="pb-3 font-semibold">Opponent Institution</th>
                         <th className="pb-3 font-semibold">Location / City</th>
-                        <th className="pb-3 font-semibold">Distance (Miles)</th>
+                        <th className="pb-3 font-semibold">Distance</th>
+                        <th className="pb-3 font-semibold">Travel Time</th>
                         <th className="pb-3 font-semibold">Conference Check</th>
                       </tr>
                     </thead>
@@ -1141,6 +1309,7 @@ export default function App() {
                           <td className={`py-3 font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{o.name}</td>
                           <td className="py-3 text-slate-400">{o.location}</td>
                           <td className="py-3 text-slate-400">{o.distance} mi</td>
+                          <td className="py-3 text-slate-400">{o.travelTime || '2h 0m'}</td>
                           <td className="py-3">
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${o.isConference ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-slate-800 text-slate-400'}`}>
                               {o.isConference ? 'Conference' : 'Non-Conference'}
@@ -1157,99 +1326,350 @@ export default function App() {
 
           {activeTab === 'budget' && (
             <div className="space-y-6 max-w-5xl mx-auto">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div>
-                  <h3 className={`text-base font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Budget & Cost Projections</h3>
-                  <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'} mt-0.5`}>Automated travel, lodging, meal, and hosting budget breakdowns across all teams.</p>
+                  <h3 className={`text-base font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Budget, Staffing & Transportation Control</h3>
+                  <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'} mt-0.5`}>Comprehensive financial models, home staffing rates, and transportation options.</p>
                 </div>
-                <div className="text-right">
-                  <span className="text-xs text-slate-400">Grand Total Budget</span>
-                  <h3 className="text-xl font-bold text-emerald-400">${budgetSummary.grandTotal.toLocaleString()}</h3>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border p-5 rounded-2xl`}>
-                  <p className="text-xs text-slate-400">Transportation</p>
-                  <h3 className="text-xl font-bold text-indigo-400 mt-1">${budgetSummary.totalTravel.toLocaleString()}</h3>
-                </div>
-                <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border p-5 rounded-2xl`}>
-                  <p className="text-xs text-slate-400">Lodging (Hotel)</p>
-                  <h3 className="text-xl font-bold text-amber-400 mt-1">${budgetSummary.totalHotel.toLocaleString()}</h3>
-                </div>
-                <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border p-5 rounded-2xl`}>
-                  <p className="text-xs text-slate-400">Per Diem Meals</p>
-                  <h3 className="text-xl font-bold text-emerald-400 mt-1">${budgetSummary.totalMeals.toLocaleString()}</h3>
-                </div>
-                <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border p-5 rounded-2xl`}>
-                  <p className="text-xs text-slate-400">Hosting & Officials</p>
-                  <h3 className="text-xl font-bold text-purple-400 mt-1">${budgetSummary.totalHosting.toLocaleString()}</h3>
+                <div className="flex bg-slate-900 border border-slate-800 p-1 rounded-xl text-xs">
+                  <button onClick={() => { setBudgetSubTab('summary'); setSelectedSportDetail(null); }} className={`px-3 py-1.5 rounded-lg font-medium transition-all ${budgetSubTab === 'summary' && !selectedSportDetail ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}>Sport Summary</button>
+                  <button onClick={() => setBudgetSubTab('staffing')} className={`px-3 py-1.5 rounded-lg font-medium transition-all ${budgetSubTab === 'staffing' ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}>Home Staffing</button>
+                  <button onClick={() => setBudgetSubTab('transport')} className={`px-3 py-1.5 rounded-lg font-medium transition-all ${budgetSubTab === 'transport' ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}>Transportation</button>
                 </div>
               </div>
 
-              <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border rounded-2xl p-6`}>
-                <h4 className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-slate-900'} mb-4`}>Sport-by-Sport Budget Breakdown</h4>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead>
-                      <tr className={`border-b ${darkMode ? 'border-slate-800 text-slate-400' : 'border-slate-200 text-slate-600'}`}>
-                        <th className="pb-3 font-semibold">Sport</th>
-                        <th className="pb-3 font-semibold">Events</th>
-                        <th className="pb-3 font-semibold">Travel</th>
-                        <th className="pb-3 font-semibold">Hotel</th>
-                        <th className="pb-3 font-semibold">Meals</th>
-                        <th className="pb-3 font-semibold">Hosting</th>
-                        <th className="pb-3 font-semibold text-right">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody className={`divide-y ${darkMode ? 'divide-slate-900' : 'divide-slate-200'}`}>
-                      {Object.entries(budgetSummary.bySport).map(([sport, b]) => {
-                        const subTotal = b.travel + b.meals + b.hotel + b.hosting;
-                        return (
-                          <tr key={sport}>
-                            <td className={`py-3 font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{sport}</td>
-                            <td className="py-3 text-slate-400">{b.count}</td>
-                            <td className="py-3 text-slate-400">${b.travel.toLocaleString()}</td>
-                            <td className="py-3 text-slate-400">${b.hotel.toLocaleString()}</td>
-                            <td className="py-3 text-slate-400">${b.meals.toLocaleString()}</td>
-                            <td className="py-3 text-slate-400">${b.hosting.toLocaleString()}</td>
-                            <td className="py-3 text-right font-bold text-emerald-400">${subTotal.toLocaleString()}</td>
+              {selectedSportDetail ? (
+                <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border rounded-2xl p-6 space-y-4`}>
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                    <div>
+                      <h4 className="text-sm font-bold text-indigo-400">{selectedSportDetail} - Scheduled Event Breakdown</h4>
+                      <p className="text-xs text-slate-400">All scheduled contests and individual event budget allocations.</p>
+                    </div>
+                    <button onClick={() => setSelectedSportDetail(null)} className="px-3 py-1.5 bg-slate-800 text-slate-300 rounded-xl text-xs">Back to Summary</button>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className={`border-b ${darkMode ? 'border-slate-800 text-slate-400' : 'border-slate-200 text-slate-600'}`}>
+                          <th className="pb-3 font-semibold">Opponent</th>
+                          <th className="pb-3 font-semibold">Type</th>
+                          <th className="pb-3 font-semibold">Date & Time</th>
+                          <th className="pb-3 font-semibold">Travel</th>
+                          <th className="pb-3 font-semibold">Hotel</th>
+                          <th className="pb-3 font-semibold">Meals</th>
+                          <th className="pb-3 font-semibold">Hosting</th>
+                        </tr>
+                      </thead>
+                      <tbody className={`divide-y ${darkMode ? 'divide-slate-900' : 'divide-slate-200'}`}>
+                        {schedules.filter(s => s.sport === selectedSportDetail && s.status !== 'Rejected').map(ev => (
+                          <tr key={ev.id}>
+                            <td className={`py-3 font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{ev.opponent}</td>
+                            <td className="py-3 text-slate-400">{ev.locationType}</td>
+                            <td className="py-3 text-slate-400">{ev.date} @ {ev.time}</td>
+                            <td className="py-3 text-slate-400">${Number(ev.travelCost || 0).toLocaleString()}</td>
+                            <td className="py-3 text-slate-400">${Number(ev.hotelCost || 0).toLocaleString()}</td>
+                            <td className="py-3 text-slate-400">${Number(ev.mealCost || 0).toLocaleString()}</td>
+                            <td className="py-3 text-slate-400">${Number(ev.hostingCost || 0).toLocaleString()}</td>
                           </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
+              ) : budgetSubTab === 'summary' ? (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border p-5 rounded-2xl`}>
+                      <p className="text-xs text-slate-400">Transportation</p>
+                      <h3 className="text-xl font-bold text-indigo-400 mt-1">${budgetSummary.totalTravel.toLocaleString()}</h3>
+                    </div>
+                    <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border p-5 rounded-2xl`}>
+                      <p className="text-xs text-slate-400">Lodging (Hotel)</p>
+                      <h3 className="text-xl font-bold text-amber-400 mt-1">${budgetSummary.totalHotel.toLocaleString()}</h3>
+                    </div>
+                    <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border p-5 rounded-2xl`}>
+                      <p className="text-xs text-slate-400">Per Diem Meals</p>
+                      <h3 className="text-xl font-bold text-emerald-400 mt-1">${budgetSummary.totalMeals.toLocaleString()}</h3>
+                    </div>
+                    <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border p-5 rounded-2xl`}>
+                      <p className="text-xs text-slate-400">Hosting & Officials</p>
+                      <h3 className="text-xl font-bold text-purple-400 mt-1">${budgetSummary.totalHosting.toLocaleString()}</h3>
+                    </div>
+                  </div>
+
+                  <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border rounded-2xl p-6`}>
+                    <h4 className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-slate-900'} mb-2`}>Sport-by-Sport Budget Summary</h4>
+                    <p className="text-xs text-slate-400 mb-4">Click any sport row below to inspect its detailed event-by-event breakdown.</p>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead>
+                          <tr className={`border-b ${darkMode ? 'border-slate-800 text-slate-400' : 'border-slate-200 text-slate-600'}`}>
+                            <th className="pb-3 font-semibold">Sport</th>
+                            <th className="pb-3 font-semibold">Events</th>
+                            <th className="pb-3 font-semibold">Travel</th>
+                            <th className="pb-3 font-semibold">Hotel</th>
+                            <th className="pb-3 font-semibold">Meals</th>
+                            <th className="pb-3 font-semibold">Hosting</th>
+                            <th className="pb-3 font-semibold text-right">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody className={`divide-y ${darkMode ? 'divide-slate-900' : 'divide-slate-200'}`}>
+                          {Object.entries(budgetSummary.bySport).map(([sport, b]) => {
+                            const subTotal = b.travel + b.meals + b.hotel + b.hosting;
+                            return (
+                              <tr key={sport} onClick={() => setSelectedSportDetail(sport)} className="cursor-pointer hover:bg-indigo-600/10 transition-colors">
+                                <td className={`py-3 font-bold text-indigo-400 flex items-center gap-1.5`}>{sport} <ChevronRight className="w-3 h-3"/></td>
+                                <td className="py-3 text-slate-400">{b.count}</td>
+                                <td className="py-3 text-slate-400">${b.travel.toLocaleString()}</td>
+                                <td className="py-3 text-slate-400">${b.hotel.toLocaleString()}</td>
+                                <td className="py-3 text-slate-400">${b.meals.toLocaleString()}</td>
+                                <td className="py-3 text-slate-400">${b.hosting.toLocaleString()}</td>
+                                <td className="py-3 text-right font-bold text-emerald-400">${subTotal.toLocaleString()}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              ) : budgetSubTab === 'staffing' ? (
+                <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border rounded-2xl p-6 space-y-4`}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Home Game Staffing Roles & Pay Rates</h4>
+                      <p className="text-xs text-slate-400">Define student worker and support staff hourly rates to calculate hosting expenses.</p>
+                    </div>
+                    <button onClick={() => setShowStaffModal(true)} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow">
+                      <Plus className="w-4 h-4"/> Add Staff Role
+                    </button>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className={`border-b ${darkMode ? 'border-slate-800 text-slate-400' : 'border-slate-200 text-slate-600'}`}>
+                          <th className="pb-3 font-semibold">Staff Role</th>
+                          <th className="pb-3 font-semibold">Hourly Rate</th>
+                          <th className="pb-3 font-semibold">Default Duration</th>
+                          <th className="pb-3 font-semibold text-right">Est. Cost / Game</th>
+                        </tr>
+                      </thead>
+                      <tbody className={`divide-y ${darkMode ? 'divide-slate-900' : 'divide-slate-200'}`}>
+                        {staffRoles.map(sr => (
+                          <tr key={sr.id}>
+                            <td className={`py-3 font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{sr.roleName}</td>
+                            <td className="py-3 text-slate-400">${sr.hourlyRate.toFixed(2)} / hr</td>
+                            <td className="py-3 text-slate-400">{sr.defaultHours} hours</td>
+                            <td className="py-3 text-right font-bold text-emerald-400">${(sr.hourlyRate * sr.defaultHours).toFixed(2)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border rounded-2xl p-6 space-y-4`}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Transportation Rate Options</h4>
+                      <p className="text-xs text-slate-400">Define transportation billing types (mileage, hourly, or flat rate) applied to away trips.</p>
+                    </div>
+                    <button onClick={() => setShowTransportModal(true)} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow">
+                      <Plus className="w-4 h-4"/> Add Transport Option
+                    </button>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className={`border-b ${darkMode ? 'border-slate-800 text-slate-400' : 'border-slate-200 text-slate-600'}`}>
+                          <th className="pb-3 font-semibold">Mode Name</th>
+                          <th className="pb-3 font-semibold">Rate Type</th>
+                          <th className="pb-3 font-semibold text-right">Rate Value</th>
+                        </tr>
+                      </thead>
+                      <tbody className={`divide-y ${darkMode ? 'divide-slate-900' : 'divide-slate-200'}`}>
+                        {transportModes.map(tm => (
+                          <tr key={tm.id}>
+                            <td className={`py-3 font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{tm.modeName}</td>
+                            <td className="py-3 text-slate-400 uppercase text-[10px] font-semibold">{tm.rateType}</td>
+                            <td className="py-3 text-right font-bold text-indigo-400">
+                              {tm.rateType === 'mileage' ? `$${tm.rateValue.toFixed(2)} / mi` : tm.rateType === 'hourly' ? `$${tm.rateValue.toFixed(2)} / hr` : `$${tm.rateValue.toFixed(2)} flat`}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'submit' && (
+            <div className={`max-w-3xl mx-auto ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-2xl p-6 shadow-xl space-y-6`}>
+              
+              {/* CSV Importer */}
+              <div className={`p-4 ${darkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'} border rounded-xl flex flex-col md:flex-row items-center justify-between gap-4`}>
+                <div>
+                  <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wide">Bulk CSV Schedule Importer</h4>
+                  <p className="text-[11px] text-slate-400 mt-0.5">Format: Sport, Opponent, LocationType, VenueName, Date (YYYY-MM-DD), Time, Notes</p>
+                </div>
+                <label className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold cursor-pointer shadow">
+                  Upload CSV File
+                  <input type="file" accept=".csv" onChange={handleCSVImport} className="hidden" />
+                </label>
               </div>
+
+              <div>
+                <h3 className="text-base font-bold">
+                  {role === 'admin' ? 'Administrative Master Schedule Entry' : `Submit Schedule for ${currentUserSport}`}
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">Enter contest details below to evaluate venue availability and projected travel/hosting budgets.</p>
+              </div>
+
+              <form onSubmit={handleScheduleSubmit} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Sport</label>
+                    <select value={formData.sport} onChange={(e) => handleSportChange(e.target.value)} disabled={role === 'coach'} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
+                      {Object.keys(sportConfigs).map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Coach / Submitter</label>
+                    <input type="text" value={formData.coachName} onChange={(e) => setFormData({...formData, coachName: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Opponent</label>
+                    <div className="flex gap-2">
+                      <select value={formData.opponent} onChange={(e) => handleOpponentOrTripChange({ opponent: e.target.value })} className={`flex-1 ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
+                        {opponents.map(o => <option key={o.id} value={o.name}>{o.name} ({o.isConference ? 'Conf' : 'Non-Conf'})</option>)}
+                      </select>
+                      <button type="button" onClick={() => setShowOpponentModal(true)} className="px-3 py-2 bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 rounded-xl text-xs font-semibold">
+                        + New
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Location Type</label>
+                    <select value={formData.locationType} onChange={(e) => handleLocationTypeChange(e.target.value)} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
+                      <option value="Home">Home</option>
+                      <option value="Away">Away</option>
+                      <option value="Neutral">Neutral Site</option>
+                      <option value="Tournament">Tournament Hosting</option>
+                      <option value="Postseason">Tentative Postseason</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {formData.locationType === 'Home' || formData.locationType === 'Tournament' ? (
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1">Assigned Venue</label>
+                      <select value={formData.venueId} onChange={(e) => setFormData({...formData, venueId: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
+                        {venues.map(v => <option key={v.id} value={v.id}>{v.name} ({v.type})</option>)}
+                      </select>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1">Destination</label>
+                      <input type="text" disabled value="Opponent Location" className={`w-full ${darkMode ? 'bg-slate-900/50 border-slate-800 text-slate-500' : 'bg-slate-100 border-slate-200 text-slate-400'} border rounded-xl px-3 py-2 text-sm`} />
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Date</label>
+                    <input type="date" required value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Start Time</label>
+                    <input type="time" required value={formData.time} onChange={(e) => setFormData({...formData, time: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                  </div>
+                </div>
+
+                <div className={`grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Duration (Hours)</label>
+                    <input type="number" step="0.5" value={formData.durationHours} onChange={(e) => setFormData({...formData, durationHours: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Warmup Buffer (Auto)</label>
+                    <input type="text" disabled value={`${(sportConfigs[formData.sport] || {}).warmupMinutes || 45} mins`} className={`w-full ${darkMode ? 'bg-slate-900/50 border-slate-800 text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-500'} border rounded-xl px-3 py-2 text-sm`} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Teardown Buffer (Auto)</label>
+                    <input type="text" disabled value={`${(sportConfigs[formData.sport] || {}).teardownMinutes || 30} mins`} className={`w-full ${darkMode ? 'bg-slate-900/50 border-slate-800 text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-500'} border rounded-xl px-3 py-2 text-sm`} />
+                  </div>
+                </div>
+
+                {formData.locationType === 'Away' && (
+                  <div className={`p-4 ${darkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'} border rounded-xl space-y-3`}>
+                    <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wide">Travel & Budget Parameters</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 mb-1">Travel Party Size</label>
+                        <input type="number" value={formData.travelPartySize} onChange={(e) => handleOpponentOrTripChange({ travelPartySize: Number(e.target.value) })} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 mb-1">Travel Mode</label>
+                        <select value={formData.travelMode} onChange={(e) => setFormData({...formData, travelMode: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
+                          <option value="Charter Bus">Charter Bus</option>
+                          <option value="Commercial Flight">Commercial Flight</option>
+                          <option value="Van Fleet">Van Fleet</option>
+                        </select>
+                      </div>
+                      <div className="flex items-center pt-5">
+                        <input type="checkbox" id="overnight" checked={formData.overnightTravel} onChange={(e) => handleOpponentOrTripChange({ overnightTravel: e.target.checked })} className="rounded text-indigo-600 w-4 h-4" />
+                        <label htmlFor="overnight" className="ml-2 text-xs font-medium">Overnight Trip (Hotel & Meals)</label>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">Notes / Special Requirements</label>
+                  <textarea rows="2" value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="Broadcast needs, equipment truck, etc."></textarea>
+                </div>
+
+                <div className="flex justify-end space-x-3 pt-4">
+                  <button type="submit" className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-lg">
+                    {role === 'admin' ? 'Save Master Schedule Event' : 'Submit Schedule for Review'}
+                  </button>
+                </div>
+              </form>
             </div>
           )}
 
           {activeTab === 'conflicts' && (
             <div className="space-y-6 max-w-5xl mx-auto">
               <div>
-                <h3 className={`text-base font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Conflict Audit & Double-Booking Log</h3>
-                <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'} mt-0.5`}>Real-time audit log verifying venue overlaps and warmup buffer clashes.</p>
+                <h3 className={`text-base font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Active Venue Conflicts & Audit Log</h3>
+                <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'} mt-0.5`}>Real-time detection of overlapping venue assignments including warmup and teardown buffers.</p>
               </div>
 
-              <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border rounded-2xl p-6`}>
+              <div className="space-y-3">
                 {activeConflictsList.length === 0 ? (
-                  <div className="text-center py-12">
-                    <CheckCircle className="w-12 h-12 text-emerald-500 mx-auto mb-3 opacity-80" />
+                  <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border rounded-2xl p-8 text-center`}>
+                    <CheckCircle className="w-10 h-10 text-emerald-500 mx-auto mb-3"/>
                     <h4 className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Zero Venue Conflicts Detected</h4>
-                    <p className="text-xs text-slate-400 mt-1">All scheduled events and warmup buffers are properly synchronized.</p>
+                    <p className="text-xs text-slate-400 mt-1">All scheduled athletic contests comply with facility availability rules.</p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    {activeConflictsList.map(c => (
-                      <div key={c.id} className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-start space-x-3">
-                        <AlertTriangle className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />
-                        <div>
-                          <h4 className="text-xs font-bold text-rose-400">{c.title}</h4>
-                          <p className="text-xs text-slate-300 mt-0.5">{c.desc}</p>
-                        </div>
+                  activeConflictsList.map(c => (
+                    <div key={c.id} className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl flex items-start space-x-3 text-rose-400">
+                      <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5"/>
+                      <div>
+                        <h4 className="text-sm font-bold">{c.title}</h4>
+                        <p className="text-xs mt-0.5 text-slate-300">{c.desc}</p>
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ))
                 )}
               </div>
             </div>
@@ -1257,6 +1677,7 @@ export default function App() {
 
         </main>
       </div>
+
     </div>
   );
 }
