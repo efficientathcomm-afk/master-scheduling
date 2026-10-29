@@ -116,6 +116,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'calendar', 'matrix', 'submit', 'venues', 'sports', 'opponents', 'budget', 'conflicts'
   const [budgetSubTab, setBudgetSubTab] = useState('summary'); // 'summary', 'staffing', 'transport', 'sport-detail'
   const [selectedSportDetail, setSelectedSportDetail] = useState(null);
+  const [editingScheduleId, setEditingScheduleId] = useState(null);
 
   // Modals
   const [showOpponentModal, setShowOpponentModal] = useState(false);
@@ -126,6 +127,7 @@ export default function App() {
 
   const [showTransportModal, setShowTransportModal] = useState(false);
   const [transportFormData, setTransportFormData] = useState({ modeName: '', rateType: 'mileage', rateValue: 3.50 });
+  const [editingTransportId, setEditingTransportId] = useState(null);
 
   const [showVenueModal, setShowVenueModal] = useState(false);
   const [editingVenue, setEditingVenue] = useState(null);
@@ -309,6 +311,57 @@ export default function App() {
     handleOpponentOrTripChange({ locationType: locType, venueId });
   };
 
+  const handleEditScheduleClick = (ev) => {
+    setEditingScheduleId(ev.id);
+    setFormData({
+      sport: ev.sport || 'Football',
+      coachName: ev.coachName || '',
+      opponent: ev.opponent || '',
+      locationType: ev.locationType || 'Home',
+      venueId: ev.venueId || 'v1',
+      date: ev.date || '',
+      time: ev.time || '14:00',
+      durationHours: ev.durationHours || 2.5,
+      warmupMinutes: ev.warmupMinutes || 45,
+      teardownMinutes: ev.teardownMinutes || 30,
+      travelCost: ev.travelCost || 0,
+      mealCost: ev.mealCost || 0,
+      hotelCost: ev.hotelCost || 0,
+      hostingCost: ev.hostingCost || 0,
+      overnightTravel: ev.overnightTravel || false,
+      travelPartySize: ev.travelPartySize || 30,
+      travelMode: ev.travelMode || 'Charter Bus',
+      notes: ev.notes || ''
+    });
+    setActiveTab('submit');
+  };
+
+  // Format date helper (2026-09-12 -> 9/12/2026)
+  const formatDateDisplay = (dateStr) => {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      const [year, month, day] = parts;
+      return `${parseInt(month, 10)}/${parseInt(day, 10)}/${year}`;
+    }
+    return dateStr;
+  };
+
+  // Format time helper (14:00 -> 2:00 PM)
+  const formatTimeDisplay = (timeStr) => {
+    if (!timeStr) return '';
+    const parts = timeStr.split(':');
+    if (parts.length >= 2) {
+      let hour = parseInt(parts[0], 10);
+      const minute = parts[1];
+      const ampm = hour >= 12 ? 'PM' : 'AM';
+      hour = hour % 12;
+      hour = hour ? hour : 12;
+      return `${hour}:${minute} ${ampm}`;
+    }
+    return timeStr;
+  };
+
   // Save/Delete Venue
   const handleSaveVenue = async (e) => {
     e.preventDefault();
@@ -386,21 +439,43 @@ export default function App() {
   const handleSaveStaffRole = (e) => {
     e.preventDefault();
     if (!staffFormData.roleName) return;
-    const newRole = { id: 'sr-' + Date.now(), ...staffFormData };
-    setStaffRoles([...staffRoles, newRole]);
+    if (editingStaffId) {
+      setStaffRoles(staffRoles.map(sr => sr.id === editingStaffId ? { ...sr, ...staffFormData } : sr));
+      showNotice('Staff role updated.');
+    } else {
+      const newRole = { id: 'sr-' + Date.now(), ...staffFormData };
+      setStaffRoles([...staffRoles, newRole]);
+      showNotice('Staff role added.');
+    }
     setShowStaffModal(false);
+    setEditingStaffId(null);
     setStaffFormData({ roleName: '', hourlyRate: 18, defaultHours: 4 });
-    showNotice('Staff role added.');
+  };
+
+  const handleDeleteStaffRole = (id) => {
+    setStaffRoles(staffRoles.filter(sr => sr.id !== id));
+    showNotice('Staff role removed.');
   };
 
   const handleSaveTransportMode = (e) => {
     e.preventDefault();
     if (!transportFormData.modeName) return;
-    const newMode = { id: 'tm-' + Date.now(), ...transportFormData };
-    setTransportModes([...transportModes, newMode]);
+    if (editingTransportId) {
+      setTransportModes(transportModes.map(tm => tm.id === editingTransportId ? { ...tm, ...transportFormData } : tm));
+      showNotice('Transportation mode updated.');
+    } else {
+      const newMode = { id: 'tm-' + Date.now(), ...transportFormData };
+      setTransportModes([...transportModes, newMode]);
+      showNotice('Transportation mode added.');
+    }
     setShowTransportModal(false);
+    setEditingTransportId(null);
     setTransportFormData({ modeName: '', rateType: 'mileage', rateValue: 3.50 });
-    showNotice('Transportation mode added.');
+  };
+
+  const handleDeleteTransportMode = (id) => {
+    setTransportModes(transportModes.filter(tm => tm.id !== id));
+    showNotice('Transportation mode removed.');
   };
 
   const handleCSVImport = (e) => {
@@ -521,7 +596,7 @@ export default function App() {
       status: formData.locationType === 'Postseason' ? 'Tentative' : (role === 'admin' ? 'Approved' : 'Pending')
     };
 
-    const conflicts = checkConflictsForEvent(submissionPayload, schedules);
+    const conflicts = checkConflictsForEvent(submissionPayload, schedules, editingScheduleId);
     const hasCritical = conflicts.some(c => c.type === 'CRITICAL');
 
     if (hasCritical && role === 'coach') {
@@ -536,11 +611,17 @@ export default function App() {
 
     try {
       const eventsRef = collection(db, 'artifacts', appId, 'public', 'data', 'events');
-      await addDoc(eventsRef, newRecord);
-      showNotice(conflicts.length > 0 ? 'Submitted with conflict warning notes.' : 'Schedule saved successfully!');
+      if (editingScheduleId) {
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', editingScheduleId), newRecord);
+        showNotice('Schedule updated successfully!');
+      } else {
+        await addDoc(eventsRef, newRecord);
+        showNotice(conflicts.length > 0 ? 'Submitted with conflict warning notes.' : 'Schedule saved successfully!');
+      }
     } catch (err) {
       showNotice('Schedule saved locally / offline.');
     }
+    setEditingScheduleId(null);
     setActiveTab(role === 'admin' ? 'dashboard' : 'calendar');
   };
 
@@ -680,7 +761,7 @@ export default function App() {
       {showStaffModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className={`${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-2xl max-w-md w-full p-6 shadow-2xl`}>
-            <h3 className="text-lg font-bold mb-3">Add Home Staffing Role</h3>
+            <h3 className="text-lg font-bold mb-3">{editingStaffId ? 'Edit Home Staffing Role' : 'Add Home Staffing Role'}</h3>
             <form onSubmit={handleSaveStaffRole} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-400 mb-1">Role Title</label>
@@ -697,8 +778,8 @@ export default function App() {
                 </div>
               </div>
               <div className="flex justify-end space-x-3 pt-3">
-                <button type="button" onClick={() => setShowStaffModal(false)} className="px-4 py-2 text-xs text-slate-400">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold">Save Role</button>
+                <button type="button" onClick={() => { setShowStaffModal(false); setEditingStaffId(null); }} className="px-4 py-2 text-xs text-slate-400">Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold">{editingStaffId ? 'Update Role' : 'Save Role'}</button>
               </div>
             </form>
           </div>
@@ -709,7 +790,7 @@ export default function App() {
       {showTransportModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className={`${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-2xl max-w-md w-full p-6 shadow-2xl`}>
-            <h3 className="text-lg font-bold mb-3">Add Transportation Option</h3>
+            <h3 className="text-lg font-bold mb-3">{editingTransportId ? 'Edit Transportation Option' : 'Add Transportation Option'}</h3>
             <form onSubmit={handleSaveTransportMode} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-400 mb-1">Transport Mode Name</label>
@@ -730,8 +811,8 @@ export default function App() {
                 </div>
               </div>
               <div className="flex justify-end space-x-3 pt-3">
-                <button type="button" onClick={() => setShowTransportModal(false)} className="px-4 py-2 text-xs text-slate-400">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold">Save Mode</button>
+                <button type="button" onClick={() => { setShowTransportModal(false); setEditingTransportId(null); }} className="px-4 py-2 text-xs text-slate-400">Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold">{editingTransportId ? 'Update Mode' : 'Save Mode'}</button>
               </div>
             </form>
           </div>
@@ -901,7 +982,7 @@ export default function App() {
             <span>Venue Matrix View</span>
           </button>
 
-          <button onClick={() => setActiveTab('submit')} className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all ${activeTab === 'submit' ? (darkMode ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20' : 'bg-indigo-50 text-indigo-700 font-semibold border border-indigo-200') : (darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-700 hover:text-slate-900')}`}>
+          <button onClick={() => { setEditingScheduleId(null); setActiveTab('submit'); }} className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all ${activeTab === 'submit' ? (darkMode ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20' : 'bg-indigo-50 text-indigo-700 font-semibold border border-indigo-200') : (darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-700 hover:text-slate-900')}`}>
             <Plus className="w-4 h-4" />
             <span>{role === 'admin' ? 'Add Schedule Event' : 'Submit / Request'}</span>
           </button>
@@ -958,7 +1039,7 @@ export default function App() {
               <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'} border rounded-2xl p-6`}>
                 <div className="flex items-center justify-between mb-4">
                   <h3 className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Recent Schedule Submissions</h3>
-                  <button onClick={() => setActiveTab('submit')} className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold flex items-center gap-1">
+                  <button onClick={() => { setEditingScheduleId(null); setActiveTab('submit'); }} className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold flex items-center gap-1">
                     <Plus className="w-3.5 h-3.5"/> Add Schedule
                   </button>
                 </div>
@@ -988,7 +1069,7 @@ export default function App() {
                             }`}>{s.locationType}</span>
                           </td>
                           <td className="py-3 text-slate-400">{s.venueName || 'Default'}</td>
-                          <td className="py-3 text-slate-400">{s.date} @ {s.time}</td>
+                          <td className="py-3 text-slate-400">{formatDateDisplay(s.date)} @ {formatTimeDisplay(s.time)}</td>
                           <td className="py-3">
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
                               s.status === 'Approved' ? 'bg-emerald-500/10 text-emerald-400' :
@@ -1003,6 +1084,7 @@ export default function App() {
                                 <button onClick={() => updateStatus(s.id, 'Rejected')} className="p-1 bg-rose-600/20 text-rose-400 rounded" title="Reject"><X className="w-3.5 h-3.5"/></button>
                               </>
                             )}
+                            <button onClick={() => handleEditScheduleClick(s)} className="p-1 bg-indigo-600/20 text-indigo-400 rounded" title="Edit"><Edit3 className="w-3.5 h-3.5"/></button>
                             <button onClick={() => deleteSchedule(s.id)} className="p-1 bg-slate-800 text-slate-400 rounded" title="Delete"><Trash2 className="w-3.5 h-3.5"/></button>
                           </td>
                         </tr>
@@ -1015,11 +1097,27 @@ export default function App() {
           )}
 
           {activeTab === 'submit' && (
-            <div className={`max-w-3xl mx-auto ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-2xl p-6 shadow-xl`}>
-              <h3 className="text-base font-bold mb-4">
-                {role === 'admin' ? 'Administrative Master Schedule Entry' : `Submit Schedule for ${currentUserSport}`}
-              </h3>
+            <div className={`max-w-3xl mx-auto ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-2xl p-6 shadow-xl space-y-6`}>
               
+              {/* CSV Importer */}
+              <div className={`p-4 ${darkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'} border rounded-xl flex flex-col md:flex-row items-center justify-between gap-4`}>
+                <div>
+                  <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wide">Bulk CSV Schedule Importer</h4>
+                  <p className="text-[11px] text-slate-400 mt-0.5">Format: Sport, Opponent, LocationType, VenueName, Date (YYYY-MM-DD), Time, Notes</p>
+                </div>
+                <label className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold cursor-pointer shadow">
+                  Upload CSV File
+                  <input type="file" accept=".csv" onChange={handleCSVImport} className="hidden" />
+                </label>
+              </div>
+
+              <div>
+                <h3 className="text-base font-bold">
+                  {editingScheduleId ? 'Edit Schedule Event' : (role === 'admin' ? 'Administrative Master Schedule Entry' : `Submit Schedule for ${currentUserSport}`)}
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">Enter contest details below to evaluate venue availability and projected travel/hosting budgets.</p>
+              </div>
+
               <form onSubmit={handleScheduleSubmit} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -1131,8 +1229,13 @@ export default function App() {
                 </div>
 
                 <div className="flex justify-end space-x-3 pt-4">
+                  {editingScheduleId && (
+                    <button type="button" onClick={() => { setEditingScheduleId(null); setActiveTab('dashboard'); }} className="px-4 py-2.5 bg-slate-800 text-slate-300 rounded-xl text-xs font-semibold">
+                      Cancel
+                    </button>
+                  )}
                   <button type="submit" className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-lg">
-                    {role === 'admin' ? 'Save Master Schedule Event' : 'Submit Schedule for Review'}
+                    {editingScheduleId ? 'Update Schedule Event' : (role === 'admin' ? 'Save Master Schedule Event' : 'Submit Schedule for Review')}
                   </button>
                 </div>
               </form>
@@ -1157,11 +1260,14 @@ export default function App() {
                       </div>
                       <h4 className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-slate-900'} mb-1`}>vs {s.opponent}</h4>
                       <p className="text-xs text-slate-400 flex items-center gap-1.5 mb-1"><MapPin className="w-3.5 h-3.5 text-slate-500"/> {s.venueName || 'Away'}</p>
-                      <p className="text-xs text-slate-400 flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5 text-slate-500"/> {s.date} @ {s.time} ({s.durationHours}h)</p>
+                      <p className="text-xs text-slate-400 flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5 text-slate-500"/> {formatDateDisplay(s.date)} @ {formatTimeDisplay(s.time)} ({s.durationHours}h)</p>
                     </div>
                     <div className={`pt-4 mt-4 border-t ${darkMode ? 'border-slate-900' : 'border-slate-100'} flex items-center justify-between`}>
                       <span className="text-[11px] text-slate-500">By {s.coachName}</span>
-                      <button onClick={() => deleteSchedule(s.id)} className="text-xs text-rose-400 hover:text-rose-300">Remove</button>
+                      <div className="space-x-2">
+                        <button onClick={() => handleEditScheduleClick(s)} className="text-xs text-indigo-400 hover:text-indigo-300">Edit</button>
+                        <button onClick={() => deleteSchedule(s.id)} className="text-xs text-rose-400 hover:text-rose-300">Remove</button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -1190,9 +1296,9 @@ export default function App() {
                             <div key={e.id} className={`p-2.5 ${darkMode ? 'bg-slate-900 text-slate-200' : 'bg-slate-100 text-slate-800'} rounded-xl text-xs space-y-1`}>
                               <div className="flex justify-between font-bold text-indigo-400">
                                 <span>{e.sport} vs {e.opponent}</span>
-                                <span>{e.time}</span>
+                                <span>{formatTimeDisplay(e.time)}</span>
                               </div>
-                              <p className="text-slate-400 text-[10px]">{e.date} &bull; Warmup: {e.warmupMinutes}m</p>
+                              <p className="text-slate-400 text-[10px]">{formatDateDisplay(e.date)} &bull; Warmup: {e.warmupMinutes}m</p>
                             </div>
                           ))
                         )}
@@ -1365,7 +1471,7 @@ export default function App() {
                           <tr key={ev.id}>
                             <td className={`py-3 font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{ev.opponent}</td>
                             <td className="py-3 text-slate-400">{ev.locationType}</td>
-                            <td className="py-3 text-slate-400">{ev.date} @ {ev.time}</td>
+                            <td className="py-3 text-slate-400">{formatDateDisplay(ev.date)} @ {formatTimeDisplay(ev.time)}</td>
                             <td className="py-3 text-slate-400">${Number(ev.travelCost || 0).toLocaleString()}</td>
                             <td className="py-3 text-slate-400">${Number(ev.hotelCost || 0).toLocaleString()}</td>
                             <td className="py-3 text-slate-400">${Number(ev.mealCost || 0).toLocaleString()}</td>
@@ -1440,7 +1546,7 @@ export default function App() {
                       <h4 className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Home Game Staffing Roles & Pay Rates</h4>
                       <p className="text-xs text-slate-400">Define student worker and support staff hourly rates to calculate hosting expenses.</p>
                     </div>
-                    <button onClick={() => setShowStaffModal(true)} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow">
+                    <button onClick={() => { setEditingStaffId(null); setStaffFormData({ roleName: '', hourlyRate: 18, defaultHours: 4 }); setShowStaffModal(true); }} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow">
                       <Plus className="w-4 h-4"/> Add Staff Role
                     </button>
                   </div>
@@ -1451,7 +1557,8 @@ export default function App() {
                           <th className="pb-3 font-semibold">Staff Role</th>
                           <th className="pb-3 font-semibold">Hourly Rate</th>
                           <th className="pb-3 font-semibold">Default Duration</th>
-                          <th className="pb-3 font-semibold text-right">Est. Cost / Game</th>
+                          <th className="pb-3 font-semibold">Est. Cost / Game</th>
+                          <th className="pb-3 font-semibold text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody className={`divide-y ${darkMode ? 'divide-slate-900' : 'divide-slate-200'}`}>
@@ -1460,7 +1567,11 @@ export default function App() {
                             <td className={`py-3 font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{sr.roleName}</td>
                             <td className="py-3 text-slate-400">${sr.hourlyRate.toFixed(2)} / hr</td>
                             <td className="py-3 text-slate-400">{sr.defaultHours} hours</td>
-                            <td className="py-3 text-right font-bold text-emerald-400">${(sr.hourlyRate * sr.defaultHours).toFixed(2)}</td>
+                            <td className="py-3 font-bold text-emerald-400">${(sr.hourlyRate * sr.defaultHours).toFixed(2)}</td>
+                            <td className="py-3 text-right space-x-2">
+                              <button onClick={() => { setEditingStaffId(sr.id); setStaffFormData({ roleName: sr.roleName, hourlyRate: sr.hourlyRate, defaultHours: sr.defaultHours }); setShowStaffModal(true); }} className={`px-2.5 py-1 ${darkMode ? 'bg-slate-900 text-slate-300' : 'bg-slate-200 text-slate-800 font-semibold'} rounded-lg`}>Edit</button>
+                              <button onClick={() => handleDeleteStaffRole(sr.id)} className="px-2.5 py-1 bg-rose-600/20 text-rose-400 rounded-lg">Remove</button>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -1474,7 +1585,7 @@ export default function App() {
                       <h4 className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Transportation Rate Options</h4>
                       <p className="text-xs text-slate-400">Define transportation billing types (mileage, hourly, or flat rate) applied to away trips.</p>
                     </div>
-                    <button onClick={() => setShowTransportModal(true)} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow">
+                    <button onClick={() => { setEditingTransportId(null); setTransportFormData({ modeName: '', rateType: 'mileage', rateValue: 3.50 }); setShowTransportModal(true); }} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow">
                       <Plus className="w-4 h-4"/> Add Transport Option
                     </button>
                   </div>
@@ -1484,7 +1595,8 @@ export default function App() {
                         <tr className={`border-b ${darkMode ? 'border-slate-800 text-slate-400' : 'border-slate-200 text-slate-600'}`}>
                           <th className="pb-3 font-semibold">Mode Name</th>
                           <th className="pb-3 font-semibold">Rate Type</th>
-                          <th className="pb-3 font-semibold text-right">Rate Value</th>
+                          <th className="pb-3 font-semibold">Rate Value</th>
+                          <th className="pb-3 font-semibold text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody className={`divide-y ${darkMode ? 'divide-slate-900' : 'divide-slate-200'}`}>
@@ -1492,8 +1604,12 @@ export default function App() {
                           <tr key={tm.id}>
                             <td className={`py-3 font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{tm.modeName}</td>
                             <td className="py-3 text-slate-400 uppercase text-[10px] font-semibold">{tm.rateType}</td>
-                            <td className="py-3 text-right font-bold text-indigo-400">
+                            <td className="py-3 font-bold text-indigo-400">
                               {tm.rateType === 'mileage' ? `$${tm.rateValue.toFixed(2)} / mi` : tm.rateType === 'hourly' ? `$${tm.rateValue.toFixed(2)} / hr` : `$${tm.rateValue.toFixed(2)} flat`}
+                            </td>
+                            <td className="py-3 text-right space-x-2">
+                              <button onClick={() => { setEditingTransportId(tm.id); setTransportFormData({ modeName: tm.modeName, rateType: tm.rateType, rateValue: tm.rateValue }); setShowTransportModal(true); }} className={`px-2.5 py-1 ${darkMode ? 'bg-slate-900 text-slate-300' : 'bg-slate-200 text-slate-800 font-semibold'} rounded-lg`}>Edit</button>
+                              <button onClick={() => handleDeleteTransportMode(tm.id)} className="px-2.5 py-1 bg-rose-600/20 text-rose-400 rounded-lg">Remove</button>
                             </td>
                           </tr>
                         ))}
