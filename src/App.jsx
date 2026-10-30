@@ -183,7 +183,7 @@ export default function App() {
       (snapshot) => {
         const loaded = [];
         snapshot.forEach(d => loaded.push({ id: d.id, ...d.data() }));
-        if (loaded.length > 0) setVenues(loaded);
+        setVenues(loaded);
       },
       (err) => {}
     );
