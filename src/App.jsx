@@ -253,6 +253,8 @@ export default function App() {
     const opponentsRef = collection(db, 'artifacts', appId, 'public', 'data', 'opponents');
     const venuesRef = collection(db, 'artifacts', appId, 'public', 'data', 'venues');
     const sportsRef = collection(db, 'artifacts', appId, 'public', 'data', 'sports');
+    const staffRef = collection(db, 'artifacts', appId, 'public', 'data', 'staffRoles');
+    const transportRef = collection(db, 'artifacts', appId, 'public', 'data', 'transportModes');
 
     setSyncStatus('Syncing Live');
 
@@ -260,11 +262,7 @@ export default function App() {
       (snapshot) => {
         const loaded = [];
         snapshot.forEach(d => loaded.push({ id: d.id, ...d.data() }));
-        if (loaded.length > 0) {
-          setSchedules(loaded);
-        } else {
-          setSchedules([]);
-        }
+        if (loaded.length > 0) setSchedules(loaded);
         setSyncStatus('Synced');
       },
       (err) => { setSyncStatus('Sync Error: ' + err.message); }
@@ -274,7 +272,10 @@ export default function App() {
       (snapshot) => {
         const loaded = [];
         snapshot.forEach(d => loaded.push({ id: d.id, ...d.data() }));
-        if (loaded.length > 0) setOpponents(loaded);
+        if (loaded.length > 0) {
+          setOpponents(loaded);
+          localStorage.setItem('app_opponents', JSON.stringify(loaded));
+        }
       },
       (err) => {}
     );
@@ -287,11 +288,70 @@ export default function App() {
           setVenues(loaded);
           localStorage.setItem('app_venues', JSON.stringify(loaded));
         } else {
-          // If remote collection is empty or deleted, preserve local state preference
-          const savedLocal = localStorage.getItem('app_venues');
-          if (savedLocal) {
-            setVenues(JSON.parse(savedLocal));
-          }
+          // If Firestore collection is empty, seed initial remote collection once
+          INITIAL_VENUES.forEach(async (v) => {
+            try {
+              await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'venues', v.id), v);
+            } catch (e) {}
+          });
+        }
+      },
+      (err) => {}
+    );
+
+    const unsubscribeSports = onSnapshot(sportsRef,
+      (snapshot) => {
+        const loaded = {};
+        snapshot.forEach(d => {
+          const data = d.data();
+          loaded[data.name || d.id] = data;
+        });
+        if (Object.keys(loaded).length > 0) {
+          setSportConfigs(loaded);
+          localStorage.setItem('app_sport_configs', JSON.stringify(loaded));
+        } else {
+          // Seed remote sports if empty
+          Object.entries(INITIAL_SPORT_CONFIGS).forEach(async ([k, val]) => {
+            try {
+              await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sports', k.replace(/[^a-zA-Z0-9]/g, '_')), val);
+            } catch (e) {}
+          });
+        }
+      },
+      (err) => {}
+    );
+
+    const unsubscribeStaff = onSnapshot(staffRef,
+      (snapshot) => {
+        const loaded = [];
+        snapshot.forEach(d => loaded.push({ id: d.id, ...d.data() }));
+        if (loaded.length > 0) {
+          setStaffRoles(loaded);
+          localStorage.setItem('app_staff_roles', JSON.stringify(loaded));
+        } else {
+          INITIAL_STAFF_ROLES.forEach(async (sr) => {
+            try {
+              await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'staffRoles', sr.id), sr);
+            } catch (e) {}
+          });
+        }
+      },
+      (err) => {}
+    );
+
+    const unsubscribeTransport = onSnapshot(transportRef,
+      (snapshot) => {
+        const loaded = [];
+        snapshot.forEach(d => loaded.push({ id: d.id, ...d.data() }));
+        if (loaded.length > 0) {
+          setTransportModes(loaded);
+          localStorage.setItem('app_transport_modes', JSON.stringify(loaded));
+        } else {
+          INITIAL_TRANSPORT_MODES.forEach(async (tm) => {
+            try {
+              await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transportModes', tm.id), tm);
+            } catch (e) {}
+          });
         }
       },
       (err) => {}
@@ -302,6 +362,8 @@ export default function App() {
       unsubscribeOpponents();
       unsubscribeVenues();
       unsubscribeSports();
+      unsubscribeStaff();
+      unsubscribeTransport();
     };
   }, [authReady]);
 
@@ -461,11 +523,11 @@ export default function App() {
   const handleSaveVenue = async (e) => {
     e.preventDefault();
     const newId = 'v-' + Date.now();
-    const venuePayload = { id: newId, ...venueFormData };
+    const venuePayload = { id: editingVenue ? editingVenue.id : newId, ...venueFormData };
     let updatedVenues;
     
     if (editingVenue) {
-      updatedVenues = venues.map(v => v.id === editingVenue.id ? { ...v, ...venueFormData } : v);
+      updatedVenues = venues.map(v => v.id === editingVenue.id ? venuePayload : v);
     } else {
       updatedVenues = [...venues, venuePayload];
     }
@@ -474,12 +536,7 @@ export default function App() {
     localStorage.setItem('app_venues', JSON.stringify(updatedVenues));
 
     try {
-      const venuesRef = collection(db, 'artifacts', appId, 'public', 'data', 'venues');
-      if (editingVenue) {
-        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'venues', editingVenue.id), venueFormData);
-      } else {
-        await addDoc(venuesRef, venuePayload);
-      }
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'venues', venuePayload.id), venuePayload);
       showNotice(editingVenue ? 'Venue updated' : 'Venue added');
     } catch (err) {
       showNotice('Venue saved locally');
@@ -491,19 +548,13 @@ export default function App() {
   };
 
   const handleDeleteVenue = async (id) => {
-    // 1. Calculate updated venues list
     const updatedVenues = venues.filter(v => v.id !== id);
-    
-    // 2. Immediately persist to state & localStorage
     setVenues(updatedVenues);
     localStorage.setItem('app_venues', JSON.stringify(updatedVenues));
 
-    // 3. Attempt Firestore delete (or fallback gracefully)
     try {
       await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'venues', id));
-    } catch (e) {
-      // Deletion remains saved in localStorage even if Firestore fails/offline
-    }
+    } catch (e) {}
 
     showNotice('Venue deleted');
   };
@@ -584,64 +635,84 @@ export default function App() {
       await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'opponents', id));
     } catch (e) {}
 
-    showNotice('Opponent removed.');
+    showNotice('Opponent deleted.');
   };
 
-  const handleSaveStaffRole = (e) => {
+  const handleSaveStaffRole = async (e) => {
     e.preventDefault();
     if (!staffFormData.roleName) return;
+    const staffId = editingStaffId || ('sr-' + Date.now());
+    const payload = { id: staffId, ...staffFormData };
     let updatedStaff;
 
     if (editingStaffId) {
-      updatedStaff = staffRoles.map(sr => sr.id === editingStaffId ? { ...sr, ...staffFormData } : sr);
+      updatedStaff = staffRoles.map(sr => sr.id === editingStaffId ? payload : sr);
       showNotice('Staff role updated.');
     } else {
-      const newRole = { id: 'sr-' + Date.now(), ...staffFormData };
-      updatedStaff = [...staffRoles, newRole];
+      updatedStaff = [...staffRoles, payload];
       showNotice('Staff role added.');
     }
 
     setStaffRoles(updatedStaff);
     localStorage.setItem('app_staff_roles', JSON.stringify(updatedStaff));
 
+    try {
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'staffRoles', staffId), payload);
+    } catch (e) {}
+
     setShowStaffModal(false);
     setEditingStaffId(null);
     setStaffFormData({ roleName: '', rateType: 'hourly', rateValue: 18, defaultHours: 4 });
   };
 
-  const handleDeleteStaffRole = (id) => {
+  const handleDeleteStaffRole = async (id) => {
     const updatedStaff = staffRoles.filter(sr => sr.id !== id);
     setStaffRoles(updatedStaff);
     localStorage.setItem('app_staff_roles', JSON.stringify(updatedStaff));
+
+    try {
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'staffRoles', id));
+    } catch (e) {}
+
     showNotice('Staff role removed.');
   };
 
-  const handleSaveTransportMode = (e) => {
+  const handleSaveTransportMode = async (e) => {
     e.preventDefault();
     if (!transportFormData.modeName) return;
+    const transportId = editingTransportId || ('tm-' + Date.now());
+    const payload = { id: transportId, ...transportFormData };
     let updatedTransport;
 
     if (editingTransportId) {
-      updatedTransport = transportModes.map(tm => tm.id === editingTransportId ? { ...tm, ...transportFormData } : tm);
+      updatedTransport = transportModes.map(tm => tm.id === editingTransportId ? payload : tm);
       showNotice('Transportation mode updated.');
     } else {
-      const newMode = { id: 'tm-' + Date.now(), ...transportFormData };
-      updatedTransport = [...transportModes, newMode];
+      updatedTransport = [...transportModes, payload];
       showNotice('Transportation mode added.');
     }
 
     setTransportModes(updatedTransport);
     localStorage.setItem('app_transport_modes', JSON.stringify(updatedTransport));
 
+    try {
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transportModes', transportId), payload);
+    } catch (e) {}
+
     setShowTransportModal(false);
     setEditingTransportId(null);
     setTransportFormData({ modeName: '', rateType: 'mileage', rateValue: 3.50 });
   };
 
-  const handleDeleteTransportMode = (id) => {
+  const handleDeleteTransportMode = async (id) => {
     const updatedTransport = transportModes.filter(tm => tm.id !== id);
     setTransportModes(updatedTransport);
     localStorage.setItem('app_transport_modes', JSON.stringify(updatedTransport));
+
+    try {
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transportModes', id));
+    } catch (e) {}
+
     showNotice('Transportation mode removed.');
   };
 
