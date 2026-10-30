@@ -8,7 +8,7 @@ import {
 
 // --- FIREBASE IMPORTS ---
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
+import { getAuth, signInAnonymously, signInWithCustomToken } from 'firebase/auth';
 import { 
   getFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot 
 } from 'firebase/firestore';
@@ -28,7 +28,7 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
-// --- INITIAL FALLBACK DATA COMPLETELY REMOVED TO PREVENT RE-INJECTING DELETED RECORDS ---
+// --- INITIAL STATE ARRAYS ---
 const INITIAL_VENUES = [];
 const INITIAL_OPPONENTS = [];
 const INITIAL_SPORT_CONFIGS = {};
@@ -47,7 +47,7 @@ export default function App() {
   const [darkMode, setDarkMode] = useState(true);
 
   // Application State
-  const [role, setRole] = useState('admin'); // 'admin' | 'coach'
+  const [role, setRole] = useState('admin');
   const [currentUserSport, setCurrentUserSport] = useState('Football');
   const [schedules, setSchedules] = useState(INITIAL_SCHEDULES);
   const [venues, setVenues] = useState(INITIAL_VENUES);
@@ -57,8 +57,8 @@ export default function App() {
   const [transportModes, setTransportModes] = useState(INITIAL_TRANSPORT_MODES);
   const [studentWorkerConfig, setStudentWorkerConfig] = useState(INITIAL_STUDENT_WORKER_SETTINGS);
   
-  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'calendar', 'matrix', 'submit', 'venues', 'sports', 'opponents', 'budget', 'conflicts'
-  const [budgetSubTab, setBudgetSubTab] = useState('summary'); // 'summary', 'staffing', 'student-workers', 'transport', 'sport-detail'
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [budgetSubTab, setBudgetSubTab] = useState('summary');
   const [selectedSportDetail, setSelectedSportDetail] = useState(null);
   const [editingScheduleId, setEditingScheduleId] = useState(null);
 
@@ -83,7 +83,7 @@ export default function App() {
   const [editingSportKey, setEditingSportKey] = useState(null);
   const [sportFormData, setSportFormData] = useState({
     name: '',
-    defaultVenueId: 'v1',
+    defaultVenueId: '',
     defaultDuration: 2.5,
     warmupMinutes: 45,
     arrivalBufferHours: 2,
@@ -96,13 +96,12 @@ export default function App() {
     studentStaffCount: 4
   });
 
-  // Form state for scheduling
   const [formData, setFormData] = useState({
     sport: 'Football',
     coachName: 'Coach Marcus Vance',
     opponent: '',
-    locationType: 'Home', // Home, Away, Neutral, Tournament, Postseason
-    venueId: 'v1',
+    locationType: 'Home',
+    venueId: '',
     date: '',
     time: '14:00',
     durationHours: 3.5,
@@ -226,14 +225,13 @@ export default function App() {
 
   const calculateCosts = (oppName, locType, overnight, partySize, sportName, tMode, roomsCount, hotelRate, durationHrs) => {
     const oppObj = opponents.find(o => o.name === oppName);
-    const config = sportConfigs[sportName] || sportConfigs['Football'] || { officialsCost: 600, staffCost: 300, studentStaffCount: 4 };
+    const config = sportConfigs[sportName] || { officialsCost: 600, staffCost: 300, studentStaffCount: 4 };
     const distance = oppObj ? oppObj.distance : 100;
     
     let travel = 0, meals = 0, hotel = 0, hosting = 0, studentWorkerCost = 0;
     const isHome = locType === 'Home' || locType === 'Tournament';
 
     if (isHome) {
-      // Officials + Staff Roles + Student Workers
       let rolesHostingTotal = 0;
       staffRoles.forEach(sr => {
         if (sr.rateType === 'flat') {
@@ -294,18 +292,18 @@ export default function App() {
   const handleLocationTypeChange = (locType) => {
     const isHome = locType === 'Home';
     const config = sportConfigs[formData.sport];
-    const venueId = isHome ? (config ? config.defaultVenueId : 'v1') : 'Away';
+    const venueId = isHome ? (config ? config.defaultVenueId : (venues[0]?.id || '')) : 'Away';
     handleOpponentOrTripChange({ locationType: locType, venueId, teardownMinutes: isHome ? 0 : 30 });
   };
 
   const handleEditScheduleClick = (ev) => {
     setEditingScheduleId(ev.id);
     setFormData({
-      sport: ev.sport || 'Football',
+      sport: ev.sport || Object.keys(sportConfigs)[0] || '',
       coachName: ev.coachName || '',
       opponent: ev.opponent || '',
       locationType: ev.locationType || 'Home',
-      venueId: ev.venueId || 'v1',
+      venueId: ev.venueId || '',
       date: ev.date || '',
       time: ev.time || '14:00',
       durationHours: ev.durationHours || 2.5,
@@ -317,7 +315,7 @@ export default function App() {
       hostingCost: ev.hostingCost || 0,
       overnightTravel: ev.overnightTravel || false,
       travelPartySize: ev.travelPartySize || 30,
-      travelMode: ev.travelMode || 'Charter Bus',
+      travelMode: ev.travelMode || '',
       hotelRoomsCount: ev.hotelRoomsCount || 15,
       customHotelCostPerNight: ev.customHotelCostPerNight || 160,
       departureDate: ev.departureDate || '',
@@ -331,7 +329,6 @@ export default function App() {
     setActiveTab('submit');
   };
 
-  // Format date helper (2026-09-12 -> 9/12/2026)
   const formatDateDisplay = (dateStr) => {
     if (!dateStr) return '';
     const parts = dateStr.split('-');
@@ -342,7 +339,6 @@ export default function App() {
     return dateStr;
   };
 
-  // Format time helper (14:00 -> 2:00 PM)
   const formatTimeDisplay = (timeStr) => {
     if (!timeStr) return '';
     const parts = timeStr.split(':');
@@ -357,7 +353,6 @@ export default function App() {
     return timeStr;
   };
 
-  // Save/Delete Venue
   const handleSaveVenue = async (e) => {
     e.preventDefault();
     const newId = 'v-' + Date.now();
@@ -394,7 +389,6 @@ export default function App() {
     showNotice('Venue deleted');
   };
 
-  // Save/Delete Sport Configs
   const handleSaveSport = async (e) => {
     e.preventDefault();
     if (!sportFormData.name) return;
@@ -410,6 +404,9 @@ export default function App() {
   };
 
   const handleDeleteSport = async (key) => {
+    try {
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sports', key.replace(/[^a-zA-Z0-9]/g, '_')));
+    } catch (err) {}
     const updated = { ...sportConfigs };
     delete updated[key];
     setSportConfigs(updated);
@@ -511,13 +508,13 @@ export default function App() {
             const venue = venues.find(v => v.name.toLowerCase() === (venueName || '').toLowerCase()) || venues[0];
             const eventObj = {
               id: 'imp-' + Date.now() + '-' + i,
-              sport: sport || 'Football',
+              sport: sport || '',
               coachName: 'Imported Schedule',
-              opponent: opponent || 'Opponent',
+              opponent: opponent || '',
               locationType: locationType || 'Home',
-              venueId: venue?.id || 'v1',
-              venueName: venue?.name || 'Alumni Memorial Stadium',
-              date: date || '2026-09-01',
+              venueId: venue?.id || '',
+              venueName: venue?.name || '',
+              date: date || '',
               time: time || '14:00',
               durationHours: 2.5,
               warmupMinutes: 45,
@@ -528,7 +525,7 @@ export default function App() {
               hostingCost: 2500,
               overnightTravel: false,
               travelPartySize: 30,
-              travelMode: 'Charter Bus',
+              travelMode: '',
               status: 'Approved',
               notes: notes || 'Imported via CSV'
             };
@@ -541,7 +538,7 @@ export default function App() {
           setSchedules(prev => [...prev, ...newEvents]);
           showNotice(`Successfully imported ${importedCount} schedule events.`);
         } else {
-          showNotice('No valid rows found in CSV. Format: Sport,Opponent,LocationType,VenueName,Date,Time,Notes', 'error');
+          showNotice('No valid rows found in CSV.', 'error');
         }
       } catch (err) {
         showNotice('Failed to parse CSV file.', 'error');
@@ -732,7 +729,6 @@ export default function App() {
       darkMode ? 'bg-slate-900 text-slate-100' : 'bg-slate-50 text-slate-900'
     }`}>
       
-      {/* Toast Notification */}
       {notification && (
         <div className={`fixed top-4 right-4 z-50 px-5 py-3 rounded-xl shadow-2xl flex items-center space-x-3 text-white transition-all transform animate-bounce ${
           notification.type === 'error' ? 'bg-rose-600' : notification.type === 'warning' ? 'bg-amber-600' : 'bg-emerald-600'
@@ -742,1198 +738,645 @@ export default function App() {
         </div>
       )}
 
-      {/* Opponent Modal */}
-      {showOpponentModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className={`${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-2xl max-w-md w-full p-6 shadow-2xl`}>
-            <h3 className="text-lg font-bold mb-2">{editingOpponentId ? 'Edit Opponent' : 'Add Opponent to Master Directory'}</h3>
-            <form onSubmit={handleAddOpponentSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1">Opponent Name</label>
-                <input type="text" required value={newOpponentData.name} onChange={(e) => setNewOpponentData({...newOpponentData, name: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="e.g. Pacific Coast University" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Location / City</label>
-                  <input type="text" required value={newOpponentData.location} onChange={(e) => setNewOpponentData({...newOpponentData, location: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="City, State" />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Distance (Miles)</label>
-                  <input type="number" value={newOpponentData.distance} onChange={(e) => setNewOpponentData({...newOpponentData, distance: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1">Travel Time Estimate</label>
-                <input type="text" value={newOpponentData.travelTime} onChange={(e) => setNewOpponentData({...newOpponentData, travelTime: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="e.g. 3h 15m" />
-              </div>
-              <div className="flex items-center space-x-2 pt-2">
-                <input type="checkbox" id="isConference" checked={newOpponentData.isConference} onChange={(e) => setNewOpponentData({...newOpponentData, isConference: e.target.checked})} className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4" />
-                <label htmlFor="isConference" className="text-xs">Conference Opponent (Yes/No Check)</label>
-              </div>
-              <div className="flex justify-end space-x-3 pt-4">
-                <button type="button" onClick={() => { setShowOpponentModal(false); setEditingOpponentId(null); }} className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold">{editingOpponentId ? 'Update Opponent' : 'Save Opponent'}</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Staff Role Modal */}
-      {showStaffModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className={`${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-2xl max-w-md w-full p-6 shadow-2xl`}>
-            <h3 className="text-lg font-bold mb-3">{editingStaffId ? 'Edit Home Staffing Role' : 'Add Home Staffing Role'}</h3>
-            <form onSubmit={handleSaveStaffRole} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1">Role Title</label>
-                <input type="text" required value={staffFormData.roleName} onChange={(e) => setStaffFormData({...staffFormData, roleName: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="e.g. Statisticians" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Rate Type</label>
-                  <select value={staffFormData.rateType} onChange={(e) => setStaffFormData({...staffFormData, rateType: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
-                    <option value="hourly">Hourly ($/hr)</option>
-                    <option value="flat">Flat Rate ($)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Rate Value ($)</label>
-                  <input type="number" step="0.5" value={staffFormData.rateValue} onChange={(e) => setStaffFormData({...staffFormData, rateValue: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                </div>
-              </div>
-              {staffFormData.rateType === 'hourly' && (
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Default Hours / Game</label>
-                  <input type="number" step="0.5" value={staffFormData.defaultHours} onChange={(e) => setStaffFormData({...staffFormData, defaultHours: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                </div>
-              )}
-              <div className="flex justify-end space-x-3 pt-3">
-                <button type="button" onClick={() => { setShowStaffModal(false); setEditingStaffId(null); }} className="px-4 py-2 text-xs text-slate-400">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold">{editingStaffId ? 'Update Role' : 'Save Role'}</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Transport Modal */}
-      {showTransportModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className={`${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-2xl max-w-md w-full p-6 shadow-2xl`}>
-            <h3 className="text-lg font-bold mb-3">{editingTransportId ? 'Edit Transportation Option' : 'Add Transportation Option'}</h3>
-            <form onSubmit={handleSaveTransportMode} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1">Transport Mode Name</label>
-                <input type="text" required value={transportFormData.modeName} onChange={(e) => setTransportFormData({...transportFormData, modeName: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="e.g. Luxury Motorcoach" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Rate Type</label>
-                  <select value={transportFormData.rateType} onChange={(e) => setTransportFormData({...transportFormData, rateType: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
-                    <option value="mileage">Mileage ($/mi)</option>
-                    <option value="hourly">Hourly ($/hr)</option>
-                    <option value="flat">Flat Rate ($)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Rate Value</label>
-                  <input type="number" step="0.05" value={transportFormData.rateValue} onChange={(e) => setTransportFormData({...transportFormData, rateValue: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                </div>
-              </div>
-              <div className="flex justify-end space-x-3 pt-3">
-                <button type="button" onClick={() => { setShowTransportModal(false); setEditingTransportId(null); }} className="px-4 py-2 text-xs text-slate-400">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold">{editingTransportId ? 'Update Mode' : 'Save Mode'}</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Venue Modal */}
-      {showVenueModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className={`${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-2xl max-w-md w-full p-6 shadow-2xl`}>
-            <h3 className="text-lg font-bold mb-3">{editingVenue ? 'Edit Venue' : 'Add New Venue'}</h3>
-            <form onSubmit={handleSaveVenue} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1">Venue Name</label>
-                <input type="text" required value={venueFormData.name} onChange={(e) => setVenueFormData({...venueFormData, name: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Facility Type</label>
-                  <input type="text" value={venueFormData.type} onChange={(e) => setVenueFormData({...venueFormData, type: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Capacity</label>
-                  <input type="number" value={venueFormData.capacity} onChange={(e) => setVenueFormData({...venueFormData, capacity: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                </div>
-              </div>
-              <div className="flex justify-end space-x-3 pt-3">
-                <button type="button" onClick={() => setShowVenueModal(false)} className="px-4 py-2 text-xs text-slate-400">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold">Save Venue</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Sport Config Modal */}
-      {showSportModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className={`${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-2xl max-w-lg w-full p-6 shadow-2xl`}>
-            <h3 className="text-lg font-bold mb-3">{editingSportKey ? 'Edit Sport Configuration' : 'Add New Sport & Budget Defaults'}</h3>
-            <form onSubmit={handleSaveSport} className="space-y-4">
-              <div>
-                <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Sport Name</label>
-                <input type="text" required disabled={editingSportKey} value={sportFormData.name} onChange={(e) => setSportFormData({...sportFormData, name: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="e.g. Field Hockey" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Primary Home Venue</label>
-                  <select value={sportFormData.defaultVenueId} onChange={(e) => setSportFormData({...sportFormData, defaultVenueId: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
-                    {venues.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Sport Tier</label>
-                  <select value={sportFormData.tier || 'Tier 2'} onChange={(e) => setSportFormData({...sportFormData, tier: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
-                    <option value="Tier 1 (Revenue)">Tier 1 (Revenue)</option>
-                    <option value="Tier 2">Tier 2</option>
-                    <option value="Tier 3">Tier 3</option>
-                  </select>
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Warmup (Mins)</label>
-                  <input type="number" value={sportFormData.warmupMinutes} onChange={(e) => setSportFormData({...sportFormData, warmupMinutes: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                </div>
-                <div>
-                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Arrival Buffer (Hrs)</label>
-                  <input type="number" step="0.5" value={sportFormData.arrivalBufferHours} onChange={(e) => setSportFormData({...sportFormData, arrivalBufferHours: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                </div>
-                <div>
-                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Departure (Hrs)</label>
-                  <input type="number" step="0.5" value={sportFormData.departureBufferHours} onChange={(e) => setSportFormData({...sportFormData, departureBufferHours: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Roster Size (Travel)</label>
-                  <input type="number" value={sportFormData.rosterSize} onChange={(e) => setSportFormData({...sportFormData, rosterSize: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                </div>
-                <div>
-                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Student Staff Count</label>
-                  <input type="number" value={sportFormData.studentStaffCount} onChange={(e) => setSportFormData({...sportFormData, studentStaffCount: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Officials Cost ($)</label>
-                  <input type="number" value={sportFormData.officialsCost} onChange={(e) => setSportFormData({...sportFormData, officialsCost: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                </div>
-                <div>
-                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Staffing Cost ($)</label>
-                  <input type="number" value={sportFormData.staffCost} onChange={(e) => setSportFormData({...sportFormData, staffCost: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                </div>
-              </div>
-              <div className="flex justify-end space-x-3 pt-3">
-                <button type="button" onClick={() => setShowSportModal(false)} className={`px-4 py-2 text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600 font-semibold'}`}>Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold">Save Sport Configuration</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Header */}
-      <header className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'} border-b px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4 sticky top-0 z-40`}>
-        <div className="flex items-center space-x-3">
-          <div className="p-2.5 bg-indigo-600/20 border border-indigo-500/30 rounded-2xl text-indigo-400">
-            <Trophy className="w-6 h-6" />
+      {/* HEADER NAVBAR */}
+      <header className={`${darkMode ? 'bg-slate-950/80 border-slate-800' : 'bg-white border-slate-200'} backdrop-blur-md sticky top-0 z-40 border-b px-6 py-4 flex items-center justify-between`}>
+        <div className="flex items-center space-x-4">
+          <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-bold shadow-lg shadow-indigo-600/30">
+            <Shield className="w-6 h-6" />
           </div>
           <div>
-            <h1 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-900'} tracking-tight`}>
-              Collegiate Athletics Master Schedule
-            </h1>
-            <p className="text-xs text-slate-400 flex items-center gap-2">
-              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              {syncStatus} &bull; Athletics Department
-            </p>
+            <h1 className="font-bold text-lg leading-tight">Athletics Master Scheduling & Budget</h1>
+            <p className="text-xs text-slate-400">Collegiate Department Portal • {syncStatus}</p>
           </div>
         </div>
 
         <div className="flex items-center space-x-3">
-          {/* Light / Dark Mode Toggle */}
-          <button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded-xl border ${darkMode ? 'bg-slate-900 border-slate-800 text-amber-400' : 'bg-slate-100 border-slate-200 text-indigo-600'} transition-all`} title="Toggle Theme">
-            {darkMode ? <Sun className="w-4 h-4"/> : <Moon className="w-4 h-4"/>}
+          <button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded-xl border ${darkMode ? 'border-slate-700 bg-slate-800 text-amber-400' : 'border-slate-300 bg-slate-100 text-slate-700'} transition-all`}>
+            {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
 
+          <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-xl border ${darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-300 bg-slate-100'}`}>
+            <Users className="w-4 h-4 text-indigo-400" />
+            <select value={role} onChange={(e) => setRole(e.target.value)} className="bg-transparent text-xs font-semibold focus:outline-none cursor-pointer">
+              <option value="admin" className={darkMode ? 'bg-slate-900 text-white' : 'bg-white text-slate-900'}>Administrator View</option>
+              <option value="coach" className={darkMode ? 'bg-slate-900 text-white' : 'bg-white text-slate-900'}>Coach View</option>
+            </select>
+          </div>
+
           {role === 'coach' && (
-            <div className={`flex items-center space-x-2 ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-slate-100 border-slate-200 text-slate-900'} border px-3 py-1.5 rounded-xl`}>
-              <span className="text-xs font-medium text-slate-400">Sport:</span>
+            <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-xl border ${darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-300 bg-slate-100'}`}>
+              <span className="text-xs font-semibold text-slate-400">Sport:</span>
               <select value={currentUserSport} onChange={(e) => setCurrentUserSport(e.target.value)} className="bg-transparent text-xs font-semibold focus:outline-none cursor-pointer">
-                {Object.keys(sportConfigs).map(s => <option key={s} value={s} className={darkMode ? 'bg-slate-900' : 'bg-white'}>{s}</option>)}
+                {Object.keys(sportConfigs).length > 0 ? (
+                  Object.keys(sportConfigs).map(s => <option key={s} value={s} className={darkMode ? 'bg-slate-900 text-white' : 'bg-white text-slate-900'}>{s}</option>)
+                ) : (
+                  <option value="Football">Football</option>
+                )}
               </select>
             </div>
           )}
-
-          <div className={`flex items-center ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200'} border p-1 rounded-xl`}>
-            <button onClick={() => setRole('admin')} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${role === 'admin' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400'}`}>
-              Admin View
-            </button>
-            <button onClick={() => setRole('coach')} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${role === 'coach' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400'}`}>
-              Coach View
-            </button>
-          </div>
         </div>
       </header>
 
-      {/* Main Container */}
-      <div className="flex-1 flex flex-col md:flex-row">
+      {/* SUB-NAV TABS */}
+      <nav className={`${darkMode ? 'bg-slate-950/40 border-slate-800' : 'bg-slate-100 border-slate-200'} border-b px-6 flex space-x-2 overflow-x-auto`}>
+        <button onClick={() => setActiveTab('dashboard')} className={`px-4 py-3 text-xs font-semibold border-b-2 flex items-center space-x-2 transition-all ${activeTab === 'dashboard' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-200'}`}>
+          <Layers className="w-4 h-4" />
+          <span>{role === 'admin' ? 'Master Dashboard' : 'My Schedule'}</span>
+        </button>
+
+        <button onClick={() => setActiveTab('submit')} className={`px-4 py-3 text-xs font-semibold border-b-2 flex items-center space-x-2 transition-all ${activeTab === 'submit' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-200'}`}>
+          <Plus className="w-4 h-4" />
+          <span>Schedule Actions</span>
+        </button>
+
+        <button onClick={() => setActiveTab('calendar')} className={`px-4 py-3 text-xs font-semibold border-b-2 flex items-center space-x-2 transition-all ${activeTab === 'calendar' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-200'}`}>
+          <Calendar className="w-4 h-4" />
+          <span>Master Venue Matrix</span>
+        </button>
+
+        <button onClick={() => setActiveTab('venues')} className={`px-4 py-3 text-xs font-semibold border-b-2 flex items-center space-x-2 transition-all ${activeTab === 'venues' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-200'}`}>
+          <MapPin className="w-4 h-4" />
+          <span>Venues</span>
+        </button>
+
+        <button onClick={() => setActiveTab('opponents')} className={`px-4 py-3 text-xs font-semibold border-b-2 flex items-center space-x-2 transition-all ${activeTab === 'opponents' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-200'}`}>
+          <Compass className="w-4 h-4" />
+          <span>Opponents</span>
+        </button>
+
+        <button onClick={() => setActiveTab('sports')} className={`px-4 py-3 text-xs font-semibold border-b-2 flex items-center space-x-2 transition-all ${activeTab === 'sports' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-200'}`}>
+          <Award className="w-4 h-4" />
+          <span>Sports Config</span>
+        </button>
+
+        <button onClick={() => setActiveTab('budget')} className={`px-4 py-3 text-xs font-semibold border-b-2 flex items-center space-x-2 transition-all ${activeTab === 'budget' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-200'}`}>
+          <DollarSign className="w-4 h-4" />
+          <span>Budget & Projections</span>
+        </button>
+
+        <button onClick={() => setActiveTab('conflicts')} className={`px-4 py-3 text-xs font-semibold border-b-2 flex items-center space-x-2 transition-all ${activeTab === 'conflicts' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-200'}`}>
+          <AlertTriangle className="w-4 h-4" />
+          <span>Conflict Audit ({activeConflictsList.length})</span>
+        </button>
+      </nav>
+
+      {/* MAIN CONTENT AREA */}
+      <main className="flex-1 p-6 max-w-7xl w-full mx-auto">
         
-        {/* Sidebar Navigation */}
-        <aside className={`w-full md:w-64 ${darkMode ? 'bg-slate-950/50 border-slate-800' : 'bg-white border-slate-300 shadow-sm'} border-r p-4 flex flex-col space-y-1`}>
-          <p className={`text-[10px] uppercase font-bold tracking-wider ${darkMode ? 'text-slate-500' : 'text-slate-600'} px-3 pb-2`}>Navigation</p>
-          
-          <button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all ${activeTab === 'dashboard' ? (darkMode ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20' : 'bg-indigo-50 text-indigo-700 font-semibold border border-indigo-200') : (darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-700 hover:text-slate-900')}`}>
-            <Layers className="w-4 h-4" />
-            <span>Master Dashboard</span>
-          </button>
-
-          <button onClick={() => setActiveTab('calendar')} className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all ${activeTab === 'calendar' ? (darkMode ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20' : 'bg-indigo-50 text-indigo-700 font-semibold border border-indigo-200') : (darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-700 hover:text-slate-900')}`}>
-            <Calendar className="w-4 h-4" />
-            <span>Schedule Calendar</span>
-          </button>
-
-          <button onClick={() => setActiveTab('matrix')} className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all ${activeTab === 'matrix' ? (darkMode ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20' : 'bg-indigo-50 text-indigo-700 font-semibold border border-indigo-200') : (darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-700 hover:text-slate-900')}`}>
-            <Grid className="w-4 h-4" />
-            <span>Venue Matrix View</span>
-          </button>
-
-          <button onClick={() => { setEditingScheduleId(null); setActiveTab('submit'); }} className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all ${activeTab === 'submit' ? (darkMode ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20' : 'bg-indigo-50 text-indigo-700 font-semibold border border-indigo-200') : (darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-700 hover:text-slate-900')}`}>
-            <Plus className="w-4 h-4" />
-            <span>{role === 'admin' ? 'Add Schedule Event' : 'Submit / Request'}</span>
-          </button>
-
-          <button onClick={() => setActiveTab('sports')} className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all ${activeTab === 'sports' ? (darkMode ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20' : 'bg-indigo-50 text-indigo-700 font-semibold border border-indigo-200') : (darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-700 hover:text-slate-900')}`}>
-            <Award className="w-4 h-4" />
-            <span>Sports Management</span>
-          </button>
-
-          <button onClick={() => setActiveTab('venues')} className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all ${activeTab === 'venues' ? (darkMode ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20' : 'bg-indigo-50 text-indigo-700 font-semibold border border-indigo-200') : (darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-700 hover:text-slate-900')}`}>
-            <MapPin className="w-4 h-4" />
-            <span>Venue Management</span>
-          </button>
-
-          <button onClick={() => setActiveTab('opponents')} className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all ${activeTab === 'opponents' ? (darkMode ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20' : 'bg-indigo-50 text-indigo-700 font-semibold border border-indigo-200') : (darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-700 hover:text-slate-900')}`}>
-            <Users className="w-4 h-4" />
-            <span>Opponent Directory</span>
-          </button>
-
-          <button onClick={() => setActiveTab('budget')} className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all ${activeTab === 'budget' ? (darkMode ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20' : 'bg-indigo-50 text-indigo-700 font-semibold border border-indigo-200') : (darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-700 hover:text-slate-900')}`}>
-            <DollarSign className="w-4 h-4" />
-            <span>Budget & Projections</span>
-          </button>
-
-          <button onClick={() => setActiveTab('conflicts')} className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all ${activeTab === 'conflicts' ? (darkMode ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20' : 'bg-indigo-50 text-indigo-700 font-semibold border border-indigo-200') : (darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-700 hover:text-slate-900')}`}>
-            <AlertTriangle className="w-4 h-4" />
-            <span>Conflict Audit Log</span>
-          </button>
-        </aside>
-
-        {/* Content Area */}
-        <main className="flex-1 p-6 overflow-y-auto">
-          {activeTab === 'dashboard' && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'} border p-5 rounded-2xl`}>
-                  <p className="text-xs text-slate-400 font-medium">Total Events</p>
-                  <h3 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'} mt-1`}>{displayedSchedules.length}</h3>
-                </div>
-                <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'} border p-5 rounded-2xl`}>
-                  <p className="text-xs text-slate-400 font-medium">Venue Conflicts</p>
-                  <h3 className="text-2xl font-bold text-rose-500 mt-1">{activeConflictsList.length}</h3>
-                </div>
-                <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'} border p-5 rounded-2xl`}>
-                  <p className="text-xs text-slate-400 font-medium">Total Projected Budget</p>
-                  <h3 className="text-2xl font-bold text-emerald-400 mt-1">${budgetSummary.grandTotal.toLocaleString()}</h3>
-                </div>
-                <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'} border p-5 rounded-2xl`}>
-                  <p className="text-xs text-slate-400 font-medium">Active Sports</p>
-                  <h3 className="text-2xl font-bold text-indigo-400 mt-1">{Object.keys(sportConfigs).length}</h3>
-                </div>
+        {/* TAB 1: DASHBOARD */}
+        {activeTab === 'dashboard' && (
+          <div className="space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-bold">Schedule & Budget Overview</h2>
+                <p className="text-xs text-slate-400">Review, approve, and audit scheduled athletic contests.</p>
               </div>
-
-              <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'} border rounded-2xl p-6`}>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Recent Schedule Submissions</h3>
-                  <button onClick={() => { setEditingScheduleId(null); setActiveTab('submit'); }} className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold flex items-center gap-1">
-                    <Plus className="w-3.5 h-3.5"/> Add Schedule
-                  </button>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead>
-                      <tr className={`border-b ${darkMode ? 'border-slate-800 text-slate-400' : 'border-slate-200 text-slate-500'}`}>
-                        <th className="pb-3 font-semibold">Sport</th>
-                        <th className="pb-3 font-semibold">Opponent</th>
-                        <th className="pb-3 font-semibold">Type</th>
-                        <th className="pb-3 font-semibold">Venue</th>
-                        <th className="pb-3 font-semibold">Date & Time</th>
-                        <th className="pb-3 font-semibold">Status</th>
-                        <th className="pb-3 font-semibold text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className={`divide-y ${darkMode ? 'divide-slate-800/60' : 'divide-slate-200'}`}>
-                      {displayedSchedules.slice(0, 8).map(s => (
-                        <tr key={s.id} className={`${darkMode ? 'hover:bg-slate-900/50' : 'hover:bg-slate-50'}`}>
-                          <td className={`py-3 font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>{s.sport}</td>
-                          <td className="py-3 text-slate-400">{s.opponent}</td>
-                          <td className="py-3">
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                              s.locationType === 'Home' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                              s.locationType === 'Away' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' :
-                              'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                            }`}>{s.locationType}</span>
-                          </td>
-                          <td className="py-3 text-slate-400">{s.venueName || 'Default'}</td>
-                          <td className="py-3 text-slate-400">{formatDateDisplay(s.date)} @ {formatTimeDisplay(s.time)}</td>
-                          <td className="py-3">
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                              s.status === 'Approved' ? 'bg-emerald-500/10 text-emerald-400' :
-                              s.status === 'Rejected' ? 'bg-rose-500/10 text-rose-400' :
-                              'bg-amber-500/10 text-amber-400'
-                            }`}>{s.status}</span>
-                          </td>
-                          <td className="py-3 text-right space-x-2">
-                            {role === 'admin' && s.status === 'Pending' && (
-                              <>
-                                <button onClick={() => updateStatus(s.id, 'Approved')} className="p-1 bg-emerald-600/20 text-emerald-400 rounded" title="Approve"><Check className="w-3.5 h-3.5"/></button>
-                                <button onClick={() => updateStatus(s.id, 'Rejected')} className="p-1 bg-rose-600/20 text-rose-400 rounded" title="Reject"><X className="w-3.5 h-3.5"/></button>
-                              </>
-                            )}
-                            <button onClick={() => handleEditScheduleClick(s)} className="p-1 bg-indigo-600/20 text-indigo-400 rounded" title="Edit"><Edit3 className="w-3.5 h-3.5"/></button>
-                            <button onClick={() => deleteSchedule(s.id)} className="p-1 bg-slate-800 text-slate-400 rounded" title="Delete"><Trash2 className="w-3.5 h-3.5"/></button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'submit' && (
-            <div className={`max-w-3xl mx-auto ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-2xl p-6 shadow-xl space-y-6`}>
-              
-              {/* CSV Importer */}
-              <div className={`p-4 ${darkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'} border rounded-xl flex flex-col md:flex-row items-center justify-between gap-4`}>
-                <div>
-                  <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wide">Bulk CSV Schedule Importer</h4>
-                  <p className="text-[11px] text-slate-400 mt-0.5">Format: Sport, Opponent, LocationType, VenueName, Date (YYYY-MM-DD), Time, Notes</p>
-                </div>
-                <label className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold cursor-pointer shadow">
-                  Upload CSV File
+              <div className="flex items-center space-x-3">
+                <label className={`px-4 py-2 rounded-xl text-xs font-semibold ${darkMode ? 'bg-slate-800 hover:bg-slate-700 text-white' : 'bg-slate-200 hover:bg-slate-300 text-slate-900'} cursor-pointer flex items-center space-x-2`}>
+                  <Download className="w-4 h-4" />
+                  <span>Import CSV Events</span>
                   <input type="file" accept=".csv" onChange={handleCSVImport} className="hidden" />
                 </label>
-              </div>
-
-              <div>
-                <h3 className="text-base font-bold">
-                  {editingScheduleId ? 'Edit Schedule Event' : (role === 'admin' ? 'Administrative Master Schedule Entry' : `Submit Schedule for ${currentUserSport}`)}
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">Enter contest details below to evaluate venue availability and projected travel/hosting budgets.</p>
-              </div>
-
-              <form onSubmit={handleScheduleSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Sport</label>
-                    <select value={formData.sport} onChange={(e) => handleSportChange(e.target.value)} disabled={role === 'coach'} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
-                      {Object.keys(sportConfigs).map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Coach / Submitter</label>
-                    <input type="text" value={formData.coachName} onChange={(e) => setFormData({...formData, coachName: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Opponent</label>
-                    <div className="flex gap-2">
-                      <select value={formData.opponent} onChange={(e) => handleOpponentOrTripChange({ opponent: e.target.value })} className={`flex-1 ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
-                        {opponents.map(o => <option key={o.id} value={o.name}>{o.name} ({o.isConference ? 'Conf' : 'Non-Conf'})</option>)}
-                      </select>
-                      <button type="button" onClick={() => setShowOpponentModal(true)} className="px-3 py-2 bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 rounded-xl text-xs font-semibold">
-                        + New
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Location Type</label>
-                    <select value={formData.locationType} onChange={(e) => handleLocationTypeChange(e.target.value)} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
-                      <option value="Home">Home</option>
-                      <option value="Away">Away</option>
-                      <option value="Neutral">Neutral Site</option>
-                      <option value="Tournament">Tournament Hosting</option>
-                      <option value="Postseason">Tentative Postseason</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {formData.locationType === 'Home' || formData.locationType === 'Tournament' ? (
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-400 mb-1">Assigned Venue</label>
-                      <select value={formData.venueId} onChange={(e) => setFormData({...formData, venueId: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
-                        {venues.map(v => <option key={v.id} value={v.id}>{v.name} ({v.type})</option>)}
-                      </select>
-                    </div>
-                  ) : (
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-400 mb-1">Destination</label>
-                      <input type="text" disabled value="Opponent Location" className={`w-full ${darkMode ? 'bg-slate-900/50 border-slate-800 text-slate-500' : 'bg-slate-100 border-slate-200 text-slate-400'} border rounded-xl px-3 py-2 text-sm`} />
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Date</label>
-                    <input type="date" required value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Start Time</label>
-                    <input type="time" required value={formData.time} onChange={(e) => setFormData({...formData, time: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                  </div>
-                </div>
-
-                <div className={`grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Duration (Hours)</label>
-                    <input type="number" step="0.5" value={formData.durationHours} onChange={(e) => setFormData({...formData, durationHours: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Warmup Buffer (Auto)</label>
-                    <input type="text" disabled value={`${(sportConfigs[formData.sport] || {}).warmupMinutes || 45} mins`} className={`w-full ${darkMode ? 'bg-slate-900/50 border-slate-800 text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-500'} border rounded-xl px-3 py-2 text-sm`} />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Teardown Buffer (Auto)</label>
-                    <input type="text" disabled value={`${(sportConfigs[formData.sport] || {}).teardownMinutes || 30} mins`} className={`w-full ${darkMode ? 'bg-slate-900/50 border-slate-800 text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-500'} border rounded-xl px-3 py-2 text-sm`} />
-                  </div>
-                </div>
-
-                {formData.locationType === 'Away' && (
-                  <div className={`p-4 ${darkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'} border rounded-xl space-y-3`}>
-                    <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wide">Travel & Budget Parameters</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-400 mb-1">Travel Party Size</label>
-                        <input type="number" value={formData.travelPartySize} onChange={(e) => handleOpponentOrTripChange({ travelPartySize: Number(e.target.value) })} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-400 mb-1">Travel Mode</label>
-                        <select value={formData.travelMode} onChange={(e) => setFormData({...formData, travelMode: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
-                          <option value="Charter Bus">Charter Bus</option>
-                          <option value="Commercial Flight">Commercial Flight</option>
-                          <option value="Van Fleet">Van Fleet</option>
-                        </select>
-                      </div>
-                      <div className="flex items-center pt-5">
-                        <input type="checkbox" id="overnight" checked={formData.overnightTravel} onChange={(e) => handleOpponentOrTripChange({ overnightTravel: e.target.checked })} className="rounded text-indigo-600 w-4 h-4" />
-                        <label htmlFor="overnight" className="ml-2 text-xs font-medium">Overnight Trip (Hotel & Meals)</label>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Notes / Special Requirements</label>
-                  <textarea rows="2" value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="Broadcast needs, equipment truck, etc."></textarea>
-                </div>
-
-                <div className="flex justify-end space-x-3 pt-4">
-                  {editingScheduleId && (
-                    <button type="button" onClick={() => { setEditingScheduleId(null); setActiveTab('dashboard'); }} className="px-4 py-2.5 bg-slate-800 text-slate-300 rounded-xl text-xs font-semibold">
-                      Cancel
-                    </button>
-                  )}
-                  <button type="submit" className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-lg">
-                    {editingScheduleId ? 'Update Schedule Event' : (role === 'admin' ? 'Save Master Schedule Event' : 'Submit Schedule for Review')}
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
-
-          {activeTab === 'calendar' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className={`text-base font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Master Schedule Calendar View</h3>
-                <span className="text-xs text-slate-400">Showing {displayedSchedules.length} events</span>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {displayedSchedules.map(s => (
-                  <div key={s.id} className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'} border rounded-2xl p-5 flex flex-col justify-between`}>
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider">{s.sport}</span>
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                          s.status === 'Approved' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'
-                        }`}>{s.status}</span>
-                      </div>
-                      <h4 className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-slate-900'} mb-1`}>vs {s.opponent}</h4>
-                      <p className="text-xs text-slate-400 flex items-center gap-1.5 mb-1"><MapPin className="w-3.5 h-3.5 text-slate-500"/> {s.venueName || 'Away'}</p>
-                      <p className="text-xs text-slate-400 flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5 text-slate-500"/> {formatDateDisplay(s.date)} @ {formatTimeDisplay(s.time)} ({s.durationHours}h)</p>
-                    </div>
-                    <div className={`pt-4 mt-4 border-t ${darkMode ? 'border-slate-900' : 'border-slate-100'} flex items-center justify-between`}>
-                      <span className="text-[11px] text-slate-500">By {s.coachName}</span>
-                      <div className="space-x-2">
-                        <button onClick={() => handleEditScheduleClick(s)} className="text-xs text-indigo-400 hover:text-indigo-300">Edit</button>
-                        <button onClick={() => deleteSchedule(s.id)} className="text-xs text-rose-400 hover:text-rose-300">Remove</button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'matrix' && (
-            <div className="space-y-4">
-              <h3 className={`text-base font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Side-by-Side Venue Availability Matrix</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {venues.map(v => {
-                  const venueEvents = schedules.filter(s => s.venueId === v.id && s.status !== 'Rejected');
-                  return (
-                    <div key={v.id} className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'} border rounded-2xl p-5`}>
-                      <div className={`flex items-center justify-between mb-3 pb-2 border-b ${darkMode ? 'border-slate-900' : 'border-slate-100'}`}>
-                        <h4 className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{v.name}</h4>
-                        <span className={`text-[10px] ${darkMode ? 'bg-slate-900 text-slate-400' : 'bg-slate-100 text-slate-600'} px-2 py-0.5 rounded`}>{v.type}</span>
-                      </div>
-                      <p className="text-xs text-slate-400 mb-3">Capacity: {v.capacity} seats</p>
-                      <div className="space-y-2">
-                        {venueEvents.length === 0 ? (
-                          <p className="text-xs text-slate-500 italic py-2">No events scheduled at this venue.</p>
-                        ) : (
-                          venueEvents.map(e => (
-                            <div key={e.id} className={`p-2.5 ${darkMode ? 'bg-slate-900 text-slate-200' : 'bg-slate-100 text-slate-800'} rounded-xl text-xs space-y-1`}>
-                              <div className="flex justify-between font-bold text-indigo-400">
-                                <span>{e.sport} vs {e.opponent}</span>
-                                <span>{formatTimeDisplay(e.time)}</span>
-                              </div>
-                              <p className="text-slate-400 text-[10px]">{formatDateDisplay(e.date)} &bull; Warmup: {e.warmupMinutes}m</p>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'sports' && (
-            <div className="space-y-6 max-w-5xl mx-auto">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className={`text-base font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Sports Management & Default Parameters</h3>
-                  <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'} mt-0.5`}>Manage sports, primary home venues, sport tiers, default warmup/travel buffers, and staffing budgets.</p>
-                </div>
-                <button onClick={() => { setEditingSportKey(null); setSportFormData({ name: '', defaultVenueId: venues[0]?.id || 'v1', defaultDuration: 2.5, warmupMinutes: 45, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 30, tier: 'Tier 2', officialsCost: 600, staffCost: 350, rosterSize: 25, studentStaffCount: 4 }); setShowSportModal(true); }} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow">
-                  <Plus className="w-4 h-4"/> Add Sport
+                <button onClick={() => setActiveTab('submit')} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center space-x-2 shadow-lg shadow-indigo-600/30">
+                  <Plus className="w-4 h-4" />
+                  <span>Add New Event</span>
                 </button>
               </div>
+            </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {Object.entries(sportConfigs).map(([key, config]) => {
-                  const venueObj = venues.find(v => v.id === config.defaultVenueId);
-                  return (
-                    <div key={key} className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border rounded-2xl p-5 flex flex-col justify-between`}>
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{config.name || key}</h4>
-                          <span className="text-[10px] bg-indigo-600/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 px-2 py-0.5 rounded-full font-semibold">{config.tier || 'Tier 2'}</span>
-                        </div>
-                        <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-3 flex items-center gap-1`}><MapPin className="w-3.5 h-3.5"/> Primary Venue: {venueObj ? venueObj.name : 'Unassigned'}</p>
-                        <div className={`grid grid-cols-2 gap-2 text-xs ${darkMode ? 'text-slate-400 bg-slate-900/40' : 'text-slate-800 bg-slate-100 border border-slate-200'} p-3 rounded-xl`}>
-                          <div>Warmup Time: <span className={`${darkMode ? 'text-white' : 'text-slate-900'} font-semibold`}>{config.warmupMinutes || 45} mins</span></div>
-                          <div>Arrival Buffer: <span className={`${darkMode ? 'text-white' : 'text-slate-900'} font-semibold`}>{config.arrivalBufferHours || 2} hrs</span></div>
-                          <div>Roster Size: <span className={`${darkMode ? 'text-white' : 'text-slate-900'} font-semibold`}>{config.rosterSize || 25}</span></div>
-                          <div>Student Staff: <span className={`${darkMode ? 'text-white' : 'text-slate-900'} font-semibold`}>{config.studentStaffCount || 4}</span></div>
-                          <div>Officials Cost: <span className="text-emerald-600 dark:text-emerald-400 font-semibold">${config.officialsCost || 600}</span></div>
-                          <div>Staff Cost: <span className="text-emerald-600 dark:text-emerald-400 font-semibold">${config.staffCost || 350}</span></div>
-                        </div>
-                      </div>
-                      <div className={`pt-4 mt-4 border-t ${darkMode ? 'border-slate-900' : 'border-slate-200'} flex justify-end space-x-2`}>
-                        <button onClick={() => { setEditingSportKey(key); setSportFormData(config); setShowSportModal(true); }} className={`px-3 py-1.5 ${darkMode ? 'bg-slate-900 text-slate-300' : 'bg-slate-200 text-slate-800 font-semibold'} rounded-xl hover:opacity-90 text-xs`}>Edit</button>
-                        <button onClick={() => handleDeleteSport(key)} className={`px-3 py-1.5 ${darkMode ? 'bg-slate-900 text-rose-400' : 'bg-rose-50 text-rose-700 font-semibold'} rounded-xl hover:opacity-90 text-xs`}>Remove</button>
-                      </div>
-                    </div>
-                  );
-                })}
+            {/* QUICK STATS */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className={`${darkMode ? 'bg-slate-950/60 border-slate-800' : 'bg-white border-slate-200'} border rounded-2xl p-4 shadow-sm`}>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Scheduled</p>
+                <h3 className="text-2xl font-bold mt-1">{displayedSchedules.length}</h3>
+              </div>
+              <div className={`${darkMode ? 'bg-slate-950/60 border-slate-800' : 'bg-white border-slate-200'} border rounded-2xl p-4 shadow-sm`}>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Estimated Budget</p>
+                <h3 className="text-2xl font-bold mt-1 text-emerald-400">${budgetSummary.grandTotal.toLocaleString()}</h3>
+              </div>
+              <div className={`${darkMode ? 'bg-slate-950/60 border-slate-800' : 'bg-white border-slate-200'} border rounded-2xl p-4 shadow-sm`}>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Active Conflicts</p>
+                <h3 className="text-2xl font-bold mt-1 text-rose-400">{activeConflictsList.length}</h3>
+              </div>
+              <div className={`${darkMode ? 'bg-slate-950/60 border-slate-800' : 'bg-white border-slate-200'} border rounded-2xl p-4 shadow-sm`}>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Venues Available</p>
+                <h3 className="text-2xl font-bold mt-1">{venues.length}</h3>
               </div>
             </div>
-          )}
 
-          {activeTab === 'venues' && (
-            <div className="space-y-6 max-w-5xl mx-auto">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className={`text-base font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Venue Management & Facilities</h3>
-                  <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'} mt-0.5`}>Add, edit, and configure athletic venues and seating capacities.</p>
-                </div>
-                <button onClick={() => { setEditingVenue(null); setVenueFormData({ name: '', type: 'Outdoor Turf', capacity: 2000 }); setShowVenueModal(true); }} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow">
-                  <Plus className="w-4 h-4"/> Add Venue
-                </button>
+            {/* SCHEDULE TABLE */}
+            <div className={`${darkMode ? 'bg-slate-950/60 border-slate-800' : 'bg-white border-slate-200'} border rounded-2xl overflow-hidden shadow-sm`}>
+              <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+                <h3 className="font-bold text-sm">Contest Submissions & Approvals</h3>
+                <span className="text-xs text-slate-400">{displayedSchedules.length} records</span>
               </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {venues.map(v => (
-                  <div key={v.id} className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border rounded-2xl p-5 flex flex-col justify-between`}>
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{v.name}</h4>
-                        <span className="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded">{v.type}</span>
-                      </div>
-                      <p className="text-xs text-slate-400 mb-4">Capacity: {v.capacity} spectators</p>
-                    </div>
-                    <div className={`pt-3 border-t ${darkMode ? 'border-slate-900' : 'border-slate-200'} flex justify-end space-x-2`}>
-                      <button onClick={() => { setEditingVenue(v); setVenueFormData({ name: v.name, type: v.type, capacity: v.capacity }); setShowVenueModal(true); }} className={`px-3 py-1.5 ${darkMode ? 'bg-slate-900 text-slate-300' : 'bg-slate-200 text-slate-800 font-semibold'} rounded-xl text-xs`}>Edit</button>
-                      <button onClick={() => handleDeleteVenue(v.id)} className={`px-3 py-1.5 ${darkMode ? 'bg-slate-900 text-rose-400' : 'bg-rose-50 text-rose-700 font-semibold'} rounded-xl text-xs`}>Remove</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'opponents' && (
-            <div className="space-y-6 max-w-5xl mx-auto">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className={`text-base font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Master Opponent Directory</h3>
-                  <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'} mt-0.5`}>Manage opponent institutions, travel distances, travel times, and conference affiliations.</p>
-                </div>
-                <button onClick={() => { setEditingOpponentId(null); setNewOpponentData({ name: '', location: '', distance: 100, travelTime: '2h 0m', isConference: true }); setShowOpponentModal(true); }} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow">
-                  <Plus className="w-4 h-4"/> Add Opponent
-                </button>
-              </div>
-
-              <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border rounded-2xl p-6`}>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead>
-                      <tr className={`border-b ${darkMode ? 'border-slate-800 text-slate-400' : 'border-slate-200 text-slate-600'}`}>
-                        <th className="pb-3 font-semibold">Opponent Institution</th>
-                        <th className="pb-3 font-semibold">Location / City</th>
-                        <th className="pb-3 font-semibold">Distance</th>
-                        <th className="pb-3 font-semibold">Travel Time</th>
-                        <th className="pb-3 font-semibold">Conference Check</th>
-                        <th className="pb-3 font-semibold text-right">Actions</th>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className={`${darkMode ? 'bg-slate-900/80 text-slate-400 border-slate-800' : 'bg-slate-100 text-slate-700 border-slate-200'} border-b text-xs uppercase tracking-wider`}>
+                      <th className="p-4">Sport</th>
+                      <th className="p-4">Opponent</th>
+                      <th className="p-4">Location</th>
+                      <th className="p-4">Date & Time</th>
+                      <th className="p-4">Venue</th>
+                      <th className="p-4">Status</th>
+                      <th className="p-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800 text-sm">
+                    {displayedSchedules.length === 0 ? (
+                      <tr>
+                        <td colSpan="7" className="text-center py-10 text-slate-500 text-xs">No scheduled events found. Click "Add New Event" or import via CSV.</td>
                       </tr>
-                    </thead>
-                    <tbody className={`divide-y ${darkMode ? 'divide-slate-900' : 'divide-slate-200'}`}>
-                      {opponents.map(o => (
-                        <tr key={o.id}>
-                          <td className={`py-3 font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{o.name}</td>
-                          <td className="py-3 text-slate-400">{o.location}</td>
-                          <td className="py-3 text-slate-400">{o.distance} mi</td>
-                          <td className="py-3 text-slate-400">{o.travelTime || '2h 0m'}</td>
-                          <td className="py-3">
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${o.isConference ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-slate-800 text-slate-400'}`}>
-                              {o.isConference ? 'Conference' : 'Non-Conference'}
-                            </span>
+                    ) : (
+                      displayedSchedules.map((ev) => (
+                        <tr key={ev.id} className={`${darkMode ? 'hover:bg-slate-900/50' : 'hover:bg-slate-50'} transition-all`}>
+                          <td className="p-4 font-semibold">{ev.sport}</td>
+                          <td className="p-4">vs {ev.opponent}</td>
+                          <td className="p-4">
+                            <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
+                              ev.locationType === 'Home' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' :
+                              ev.locationType === 'Away' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
+                            }`}>{ev.locationType}</span>
                           </td>
-                          <td className="py-3 text-right space-x-2">
-                            <button onClick={() => { setEditingOpponentId(o.id); setNewOpponentData({ name: o.name, location: o.location, distance: o.distance, travelTime: o.travelTime || '2h 0m', isConference: o.isConference }); setShowOpponentModal(true); }} className={`px-2.5 py-1 ${darkMode ? 'bg-slate-900 text-slate-300' : 'bg-slate-200 text-slate-800 font-semibold'} rounded-lg`}>Edit</button>
-                            <button onClick={() => handleDeleteOpponent(o.id)} className="px-2.5 py-1 bg-rose-600/20 text-rose-400 rounded-lg">Remove</button>
+                          <td className="p-4 text-xs text-slate-300">
+                            {formatDateDisplay(ev.date)} {formatTimeDisplay(ev.time)}
+                          </td>
+                          <td className="p-4 text-xs text-slate-300">{ev.venueName || 'TBD'}</td>
+                          <td className="p-4">
+                            <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                              ev.status === 'Approved' ? 'bg-emerald-500/10 text-emerald-400' :
+                              ev.status === 'Rejected' ? 'bg-rose-500/10 text-rose-400' : 'bg-amber-500/10 text-amber-400'
+                            }`}>{ev.status || 'Pending'}</span>
+                          </td>
+                          <td className="p-4 text-right space-x-2">
+                            <button onClick={() => handleEditScheduleClick(ev)} className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all" title="Edit">
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+                            {role === 'admin' && ev.status === 'Pending' && (
+                              <>
+                                <button onClick={() => updateStatus(ev.id, 'Approved')} className="p-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 transition-all" title="Approve">
+                                  <Check className="w-4 h-4" />
+                                </button>
+                                <button onClick={() => updateStatus(ev.id, 'Rejected')} className="p-1.5 rounded-lg bg-rose-600/20 text-rose-400 hover:bg-rose-600/30 transition-all" title="Reject">
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </>
+                            )}
+                            <button onClick={() => deleteSchedule(ev.id)} className="p-1.5 rounded-lg bg-rose-600/20 text-rose-400 hover:bg-rose-600/30 transition-all" title="Delete">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </td>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
-          )}
+          </div>
+        )}
 
-          {activeTab === 'budget' && (
-            <div className="space-y-6 max-w-5xl mx-auto">
-              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                <div>
-                  <h3 className={`text-base font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Budget, Staffing & Transportation Control</h3>
-                  <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'} mt-0.5`}>Comprehensive financial models, home staffing rates, student workers, and transportation options.</p>
-                </div>
-                <div className="flex bg-slate-900 border border-slate-800 p-1 rounded-xl text-xs flex-wrap gap-1">
-                  <button onClick={() => { setBudgetSubTab('summary'); setSelectedSportDetail(null); }} className={`px-3 py-1.5 rounded-lg font-medium transition-all ${budgetSubTab === 'summary' && !selectedSportDetail ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}>Sport Summary</button>
-                  <button onClick={() => setBudgetSubTab('staffing')} className={`px-3 py-1.5 rounded-lg font-medium transition-all ${budgetSubTab === 'staffing' ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}>Home Staffing</button>
-                  <button onClick={() => setBudgetSubTab('student-workers')} className={`px-3 py-1.5 rounded-lg font-medium transition-all ${budgetSubTab === 'student-workers' ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}>Student Workers</button>
-                  <button onClick={() => setBudgetSubTab('transport')} className={`px-3 py-1.5 rounded-lg font-medium transition-all ${budgetSubTab === 'transport' ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}>Transportation</button>
-                </div>
-              </div>
-
-              {selectedSportDetail ? (
-                <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border rounded-2xl p-6 space-y-4`}>
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                    <div>
-                      <h4 className="text-sm font-bold text-indigo-400">{selectedSportDetail} - Scheduled Event Breakdown</h4>
-                      <p className="text-xs text-slate-400">All scheduled contests and individual event budget allocations.</p>
-                    </div>
-                    <button onClick={() => setSelectedSportDetail(null)} className="px-3 py-1.5 bg-slate-800 text-slate-300 rounded-xl text-xs">Back to Summary</button>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
-                      <thead>
-                        <tr className={`border-b ${darkMode ? 'border-slate-800 text-slate-400' : 'border-slate-200 text-slate-600'}`}>
-                          <th className="pb-3 font-semibold">Opponent</th>
-                          <th className="pb-3 font-semibold">Type</th>
-                          <th className="pb-3 font-semibold">Date & Time</th>
-                          <th className="pb-3 font-semibold">Travel</th>
-                          <th className="pb-3 font-semibold">Hotel</th>
-                          <th className="pb-3 font-semibold">Meals</th>
-                          <th className="pb-3 font-semibold">Hosting</th>
-                        </tr>
-                      </thead>
-                      <tbody className={`divide-y ${darkMode ? 'divide-slate-900' : 'divide-slate-200'}`}>
-                        {schedules.filter(s => s.sport === selectedSportDetail && s.status !== 'Rejected').map(ev => (
-                          <tr key={ev.id}>
-                            <td className={`py-3 font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{ev.opponent}</td>
-                            <td className="py-3 text-slate-400">{ev.locationType}</td>
-                            <td className="py-3 text-slate-400">{formatDateDisplay(ev.date)} @ {formatTimeDisplay(ev.time)}</td>
-                            <td className="py-3 text-slate-400">${Number(ev.travelCost || 0).toLocaleString()}</td>
-                            <td className="py-3 text-slate-400">${Number(ev.hotelCost || 0).toLocaleString()}</td>
-                            <td className="py-3 text-slate-400">${Number(ev.mealCost || 0).toLocaleString()}</td>
-                            <td className="py-3 text-slate-400">${Number(ev.hostingCost || 0).toLocaleString()}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              ) : budgetSubTab === 'summary' ? (
-                <>
-                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                    <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border p-4 rounded-2xl`}>
-                      <p className="text-xs text-slate-400">Transportation</p>
-                      <h3 className="text-lg font-bold text-indigo-400 mt-1">${budgetSummary.totalTravel.toLocaleString()}</h3>
-                    </div>
-                    <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border p-4 rounded-2xl`}>
-                      <p className="text-xs text-slate-400">Lodging (Hotel)</p>
-                      <h3 className="text-lg font-bold text-amber-400 mt-1">${budgetSummary.totalHotel.toLocaleString()}</h3>
-                    </div>
-                    <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border p-4 rounded-2xl`}>
-                      <p className="text-xs text-slate-400">Per Diem Meals</p>
-                      <h3 className="text-lg font-bold text-emerald-400 mt-1">${budgetSummary.totalMeals.toLocaleString()}</h3>
-                    </div>
-                    <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border p-4 rounded-2xl`}>
-                      <p className="text-xs text-slate-400">Student Workers</p>
-                      <h3 className="text-lg font-bold text-blue-400 mt-1">${budgetSummary.totalStudentWorkers.toLocaleString()}</h3>
-                    </div>
-                    <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border p-4 rounded-2xl`}>
-                      <p className="text-xs text-slate-400">Officials & Staff</p>
-                      <h3 className="text-lg font-bold text-purple-400 mt-1">${budgetSummary.totalHosting.toLocaleString()}</h3>
-                    </div>
-                  </div>
-
-                  <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border rounded-2xl p-6`}>
-                    <h4 className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-slate-900'} mb-2`}>Sport-by-Sport Budget Summary</h4>
-                    <p className="text-xs text-slate-400 mb-4">Click any sport row below to inspect its detailed event-by-event breakdown.</p>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs">
-                        <thead>
-                          <tr className={`border-b ${darkMode ? 'border-slate-800 text-slate-400' : 'border-slate-200 text-slate-600'}`}>
-                            <th className="pb-3 font-semibold">Sport</th>
-                            <th className="pb-3 font-semibold">Events</th>
-                            <th className="pb-3 font-semibold">Travel</th>
-                            <th className="pb-3 font-semibold">Hotel</th>
-                            <th className="pb-3 font-semibold">Meals</th>
-                            <th className="pb-3 font-semibold">Student Wk</th>
-                            <th className="pb-3 font-semibold">Hosting/Other</th>
-                            <th className="pb-3 font-semibold text-right">Total</th>
-                          </tr>
-                        </thead>
-                        <tbody className={`divide-y ${darkMode ? 'divide-slate-900' : 'divide-slate-200'}`}>
-                          {Object.entries(budgetSummary.bySport).map(([sport, b]) => {
-                            const subTotal = b.travel + b.meals + b.hotel + b.hosting + b.studentWorkers;
-                            return (
-                              <tr key={sport} onClick={() => setSelectedSportDetail(sport)} className="cursor-pointer hover:bg-indigo-600/10 transition-colors">
-                                <td className={`py-3 font-bold text-indigo-400 flex items-center gap-1.5`}>{sport} <ChevronRight className="w-3 h-3"/></td>
-                                <td className="py-3 text-slate-400">{b.count}</td>
-                                <td className="py-3 text-slate-400">${b.travel.toLocaleString()}</td>
-                                <td className="py-3 text-slate-400">${b.hotel.toLocaleString()}</td>
-                                <td className="py-3 text-slate-400">${b.meals.toLocaleString()}</td>
-                                <td className="py-3 text-slate-400">${b.studentWorkers.toLocaleString()}</td>
-                                <td className="py-3 text-slate-400">${b.hosting.toLocaleString()}</td>
-                                <td className="py-3 text-right font-bold text-emerald-400">${subTotal.toLocaleString()}</td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </>
-              ) : budgetSubTab === 'staffing' ? (
-                <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border rounded-2xl p-6 space-y-4`}>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Home Game Staffing Roles & Pay Rates</h4>
-                      <p className="text-xs text-slate-400">Define support staff flat or hourly rates to calculate hosting expenses.</p>
-                    </div>
-                    <button onClick={() => { setEditingStaffId(null); setStaffFormData({ roleName: '', rateType: 'hourly', rateValue: 18, defaultHours: 4 }); setShowStaffModal(true); }} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow">
-                      <Plus className="w-4 h-4"/> Add Staff Role
-                    </button>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
-                      <thead>
-                        <tr className={`border-b ${darkMode ? 'border-slate-800 text-slate-400' : 'border-slate-200 text-slate-600'}`}>
-                          <th className="pb-3 font-semibold">Staff Role</th>
-                          <th className="pb-3 font-semibold">Rate Type</th>
-                          <th className="pb-3 font-semibold">Rate Value</th>
-                          <th className="pb-3 font-semibold">Default Duration</th>
-                          <th className="pb-3 font-semibold text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className={`divide-y ${darkMode ? 'divide-slate-900' : 'divide-slate-200'}`}>
-                        {staffRoles.map(sr => (
-                          <tr key={sr.id}>
-                            <td className={`py-3 font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{sr.roleName}</td>
-                            <td className="py-3 text-slate-400 uppercase text-[10px] font-semibold">{sr.rateType}</td>
-                            <td className="py-3 text-slate-400">
-                              {sr.rateType === 'flat' ? `$${sr.rateValue.toFixed(2)} flat` : `$${sr.rateValue.toFixed(2)} / hr`}
-                            </td>
-                            <td className="py-3 text-slate-400">{sr.rateType === 'hourly' ? `${sr.defaultHours} hours` : 'N/A'}</td>
-                            <td className="py-3 text-right space-x-2">
-                              <button onClick={() => { setEditingStaffId(sr.id); setStaffFormData({ roleName: sr.roleName, rateType: sr.rateType || 'hourly', rateValue: sr.rateValue, defaultHours: sr.defaultHours }); setShowStaffModal(true); }} className={`px-2.5 py-1 ${darkMode ? 'bg-slate-900 text-slate-300' : 'bg-slate-200 text-slate-800 font-semibold'} rounded-lg`}>Edit</button>
-                              <button onClick={() => handleDeleteStaffRole(sr.id)} className="px-2.5 py-1 bg-rose-600/20 text-rose-400 rounded-lg">Remove</button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              ) : budgetSubTab === 'student-workers' ? (
-                <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border rounded-2xl p-6 space-y-4 max-w-xl`}>
-                  <div>
-                    <h4 className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Student Worker Department Settings</h4>
-                    <p className="text-xs text-slate-400 mt-0.5">Configure global hourly rate and pre/post-game prep time added to game durations.</p>
-                  </div>
-                  <div className="space-y-4 pt-2">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-400 mb-1">Student Worker Hourly Rate ($)</label>
-                      <input type="number" step="0.25" value={studentWorkerConfig.hourlyRate} onChange={(e) => setStudentWorkerConfig({...studentWorkerConfig, hourlyRate: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-400 mb-1">Prep & Teardown Additional Time (Minutes)</label>
-                      <input type="number" value={studentWorkerConfig.prepAndTeardownMinutes} onChange={(e) => setStudentWorkerConfig({...studentWorkerConfig, prepAndTeardownMinutes: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="e.g. 90 minutes" />
-                      <p className="text-[10px] text-slate-500 mt-1">This time is automatically added to each sport's contest length for total student worker payroll calculation.</p>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border rounded-2xl p-6 space-y-4`}>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Transportation Rate Options</h4>
-                      <p className="text-xs text-slate-400">Define transportation billing types (mileage, hourly, or flat rate) applied to away trips.</p>
-                    </div>
-                    <button onClick={() => { setEditingTransportId(null); setTransportFormData({ modeName: '', rateType: 'mileage', rateValue: 3.50 }); setShowTransportModal(true); }} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow">
-                      <Plus className="w-4 h-4"/> Add Transport Option
-                    </button>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
-                      <thead>
-                        <tr className={`border-b ${darkMode ? 'border-slate-800 text-slate-400' : 'border-slate-200 text-slate-600'}`}>
-                          <th className="pb-3 font-semibold">Mode Name</th>
-                          <th className="pb-3 font-semibold">Rate Type</th>
-                          <th className="pb-3 font-semibold">Rate Value</th>
-                          <th className="pb-3 font-semibold text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className={`divide-y ${darkMode ? 'divide-slate-900' : 'divide-slate-200'}`}>
-                        {transportModes.map(tm => (
-                          <tr key={tm.id}>
-                            <td className={`py-3 font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{tm.modeName}</td>
-                            <td className="py-3 text-slate-400 uppercase text-[10px] font-semibold">{tm.rateType}</td>
-                            <td className="py-3 font-bold text-indigo-400">
-                              {tm.rateType === 'mileage' ? `$${tm.rateValue.toFixed(2)} / mi` : tm.rateType === 'hourly' ? `$${tm.rateValue.toFixed(2)} / hr` : `$${tm.rateValue.toFixed(2)} flat`}
-                            </td>
-                            <td className="py-3 text-right space-x-2">
-                              <button onClick={() => { setEditingTransportId(tm.id); setTransportFormData({ modeName: tm.modeName, rateType: tm.rateType, rateValue: tm.rateValue }); setShowTransportModal(true); }} className={`px-2.5 py-1 ${darkMode ? 'bg-slate-900 text-slate-300' : 'bg-slate-200 text-slate-800 font-semibold'} rounded-lg`}>Edit</button>
-                              <button onClick={() => handleDeleteTransportMode(tm.id)} className="px-2.5 py-1 bg-rose-600/20 text-rose-400 rounded-lg">Remove</button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'submit' && (
-            <div className={`max-w-3xl mx-auto ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-2xl p-6 shadow-xl space-y-6`}>
-              
-              {!editingScheduleId && formData.locationType === '' ? (
-                <div className="space-y-6">
-                  <div>
-                    <h3 className="text-base font-bold">Select Schedule Entry Method</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Choose how you would like to add your contest details below.</p>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <button onClick={() => setFormData(prev => ({ ...prev, locationType: 'Home' }))} className={`p-4 rounded-xl border text-left transition-all ${darkMode ? 'bg-slate-900 border-slate-800 hover:border-indigo-500' : 'bg-slate-50 border-slate-200 hover:border-indigo-500'}`}>
-                      <h4 className="text-sm font-bold text-indigo-400">Add Home Event</h4>
-                      <p className="text-xs text-slate-400 mt-1">Standard home contest at your assigned facility.</p>
-                    </button>
-
-                    <button onClick={() => setFormData(prev => ({ ...prev, locationType: 'Away' }))} className={`p-4 rounded-xl border text-left transition-all ${darkMode ? 'bg-slate-900 border-slate-800 hover:border-indigo-500' : 'bg-slate-50 border-slate-200 hover:border-indigo-500'}`}>
-                      <h4 className="text-sm font-bold text-indigo-400">Add Road Event</h4>
-                      <p className="text-xs text-slate-400 mt-1">Away contest with transportation and lodging calculations.</p>
-                    </button>
-
-                    <button onClick={() => setFormData(prev => ({ ...prev, locationType: 'Neutral' }))} className={`p-4 rounded-xl border text-left transition-all ${darkMode ? 'bg-slate-900 border-slate-800 hover:border-indigo-500' : 'bg-slate-50 border-slate-200 hover:border-indigo-500'}`}>
-                      <h4 className="text-sm font-bold text-indigo-400">Add Neutral Site Event</h4>
-                      <p className="text-xs text-slate-400 mt-1">Contest hosted at a neutral location.</p>
-                    </button>
-
-                    <button onClick={() => setFormData(prev => ({ ...prev, locationType: 'Tournament' }))} className={`p-4 rounded-xl border text-left transition-all ${darkMode ? 'bg-slate-900 border-slate-800 hover:border-indigo-500' : 'bg-slate-50 border-slate-200 hover:border-indigo-500'}`}>
-                      <h4 className="text-sm font-bold text-indigo-400">Add Home Tournament</h4>
-                      <p className="text-xs text-slate-400 mt-1">Multi-game tournament hosted on campus.</p>
-                    </button>
-
-                    <button onClick={() => setFormData(prev => ({ ...prev, locationType: 'AwayTournament' }))} className={`p-4 rounded-xl border text-left transition-all ${darkMode ? 'bg-slate-900 border-slate-800 hover:border-indigo-500' : 'bg-slate-50 border-slate-200 hover:border-indigo-500'}`}>
-                      <h4 className="text-sm font-bold text-indigo-400">Add Road Tournament</h4>
-                      <p className="text-xs text-slate-400 mt-1">Away multi-game tournament trip.</p>
-                    </button>
-
-                    <label className={`p-4 rounded-xl border text-left cursor-pointer transition-all ${darkMode ? 'bg-slate-900 border-slate-800 hover:border-indigo-500' : 'bg-slate-50 border-slate-200 hover:border-indigo-500'}`}>
-                      <h4 className="text-sm font-bold text-indigo-400">Import from CSV</h4>
-                      <p className="text-xs text-slate-400 mt-1">Bulk upload conference schedules via CSV file.</p>
-                      <input type="file" accept=".csv" onChange={handleCSVImport} className="hidden" />
-                    </label>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-base font-bold">
-                        {editingScheduleId ? 'Edit Schedule Event' : `New ${formData.locationType} Event`}
-                      </h3>
-                      <p className="text-xs text-slate-400 mt-0.5">Enter contest details below.</p>
-                    </div>
-                    {!editingScheduleId && (
-                      <button type="button" onClick={() => setFormData(prev => ({ ...prev, locationType: '' }))} className="text-xs text-indigo-400 hover:underline">
-                        &larr; Back to Actions
-                      </button>
-                    )}
-                  </div>
-
-                  <form onSubmit={handleScheduleSubmit} className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-400 mb-1">Sport</label>
-                        <select value={formData.sport} onChange={(e) => handleSportChange(e.target.value)} disabled={role === 'coach'} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
-                          {Object.keys(sportConfigs).map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-400 mb-1">Coach / Submitter</label>
-                        <input type="text" value={formData.coachName} onChange={(e) => setFormData({...formData, coachName: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-400 mb-1">Opponent</label>
-                        <div className="flex gap-2">
-                          <select value={formData.opponent} onChange={(e) => handleOpponentOrTripChange({ opponent: e.target.value })} className={`flex-1 ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
-                            <option value="">-- Select Opponent --</option>
-                            {opponents.map(o => <option key={o.id} value={o.name}>{o.name} ({o.isConference ? 'Conf' : 'Non-Conf'})</option>)}
-                          </select>
-                          <button type="button" onClick={() => { setEditingOpponentId(null); setNewOpponentData({ name: '', location: '', distance: 100, travelTime: '2h 0m', isConference: true }); setShowOpponentModal(true); }} className="px-3 py-2 bg-indigo-600/25 border border-indigo-500/30 text-indigo-400 rounded-xl text-xs font-semibold">
-                            + New
-                          </button>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-400 mb-1">Location Type</label>
-                        <input type="text" disabled value={formData.locationType} className={`w-full ${darkMode ? 'bg-slate-900/50 border-slate-800 text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-600'} border rounded-xl px-3 py-2 text-sm`} />
-                      </div>
-                    </div>
-
-                    {formData.locationType === 'Neutral' && (
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-400 mb-1">Neutral Site / Location Name</label>
-                        <input type="text" value={formData.neutralLocationName} onChange={(e) => setFormData({...formData, neutralLocationName: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="e.g. Regional Championship Complex" />
-                      </div>
-                    )}
-
-                    {(formData.locationType === 'Tournament' || formData.locationType === 'AwayTournament') && (
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-400 mb-1">Tournament Details (Other Teams & Game Times)</label>
-                        <textarea rows="2" value={formData.tournamentDetails} onChange={(e) => setFormData({...formData, tournamentDetails: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="Game 2 vs Team B @ 7:00 PM, etc."></textarea>
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {formData.locationType === 'Home' || formData.locationType === 'Tournament' ? (
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-400 mb-1">Assigned Venue</label>
-                          <select value={formData.venueId} onChange={(e) => setFormData({...formData, venueId: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
-                            {venues.map(v => <option key={v.id} value={v.id}>{v.name} ({v.type})</option>)}
-                          </select>
-                        </div>
-                      ) : (
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-400 mb-1">Destination</label>
-                          <input type="text" disabled value="Opponent Location" className={`w-full ${darkMode ? 'bg-slate-900/50 border-slate-800 text-slate-500' : 'bg-slate-100 border-slate-200 text-slate-400'} border rounded-xl px-3 py-2 text-sm`} />
-                        </div>
-                      )}
-
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-400 mb-1">Date</label>
-                        <input type="date" required value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-400 mb-1">Start Time</label>
-                        <input type="time" required value={formData.time} onChange={(e) => setFormData({...formData, time: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                      </div>
-                    </div>
-
-                    <div className={`grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-400 mb-1">Duration (Hours)</label>
-                        <input type="number" step="0.5" value={formData.durationHours} onChange={(e) => setFormData({...formData, durationHours: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-400 mb-1">Warmup Buffer (Auto)</label>
-                        <input type="text" disabled value={`${(sportConfigs[formData.sport] || {}).warmupMinutes || 45} mins`} className={`w-full ${darkMode ? 'bg-slate-900/50 border-slate-800 text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-500'} border rounded-xl px-3 py-2 text-sm`} />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-400 mb-1">Teardown Buffer</label>
-                        <input type="text" disabled value={formData.locationType === 'Home' ? '0 mins (None)' : `${(sportConfigs[formData.sport] || {}).teardownMinutes || 30} mins`} className={`w-full ${darkMode ? 'bg-slate-900/50 border-slate-800 text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-500'} border rounded-xl px-3 py-2 text-sm`} />
-                      </div>
-                    </div>
-
-                    {(formData.locationType === 'Away' || formData.locationType === 'AwayTournament') && (
-                      <div className={`p-4 ${darkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'} border rounded-xl space-y-3`}>
-                        <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wide">Travel, Logistics & Projected Schedule</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-400 mb-1">Travel Party Size</label>
-                            <input type="number" value={formData.travelPartySize} onChange={(e) => handleOpponentOrTripChange({ travelPartySize: Number(e.target.value) })} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-400 mb-1">Travel Mode</label>
-                            <select value={formData.travelMode} onChange={(e) => handleOpponentOrTripChange({ travelMode: e.target.value })} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
-                              {transportModes.map(tm => <option key={tm.id} value={tm.modeName}>{tm.modeName}</option>)}
-                            </select>
-                          </div>
-                          <div className="flex items-center pt-5">
-                            <input type="checkbox" id="overnight" checked={formData.overnightTravel} onChange={(e) => handleOpponentOrTripChange({ overnightTravel: e.target.checked })} className="rounded text-indigo-600 w-4 h-4" />
-                            <label htmlFor="overnight" className="ml-2 text-xs font-medium">Overnight Trip (Hotel & Meals)</label>
-                          </div>
-                        </div>
-
-                        {formData.overnightTravel && (
-                          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 pt-2 border-t border-slate-800">
-                            <div>
-                              <label className="block text-xs font-semibold text-slate-400 mb-1">Hotel Rooms Count</label>
-                              <input type="number" value={formData.hotelRoomsCount} onChange={(e) => handleOpponentOrTripChange({ hotelRoomsCount: Number(e.target.value) })} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-semibold text-slate-400 mb-1">Cost Per Room / Night ($)</label>
-                              <input type="number" value={formData.customHotelCostPerNight} onChange={(e) => handleOpponentOrTripChange({ customHotelCostPerNight: Number(e.target.value) })} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-semibold text-slate-400 mb-1">Departure Date & Time</label>
-                              <input type="datetime-local" value={formData.departureDate} onChange={(e) => setFormData({...formData, departureDate: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-semibold text-slate-400 mb-1">Return Date & Time</label>
-                              <input type="datetime-local" value={formData.returnDate} onChange={(e) => setFormData({...formData, returnDate: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="pt-2 text-xs text-indigo-300 flex justify-between">
-                          <span>Projected Travel Expense: <strong>${formData.travelCost.toLocaleString()}</strong></span>
-                          <span>Projected Lodging: <strong>${formData.hotelCost.toLocaleString()}</strong></span>
-                          <span>Projected Meals: <strong>${formData.mealCost.toLocaleString()}</strong></span>
-                        </div>
-                      </div>
-                    )}
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-400 mb-1">Notes / Special Requirements</label>
-                      <textarea rows="2" value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="Broadcast needs, equipment truck, etc."></textarea>
-                    </div>
-
-                    <div className="flex justify-end space-x-3 pt-4">
-                      {editingScheduleId && (
-                        <button type="button" onClick={() => { setEditingScheduleId(null); setActiveTab('dashboard'); }} className="px-4 py-2.5 bg-slate-800 text-slate-300 rounded-xl text-xs font-semibold">
-                          Cancel
-                        </button>
-                      )}
-                      <button type="submit" className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-lg">
-                        {editingScheduleId ? 'Update Schedule Event' : (role === 'admin' ? 'Save Master Schedule Event' : 'Submit Schedule for Review')}
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'conflicts' && (
-            <div className="space-y-6 max-w-5xl mx-auto">
+        {/* TAB 2: SCHEDULE ACTIONS (QUICK-ACTION SUBMIT) */}
+        {activeTab === 'submit' && (
+          <div className="max-w-2xl mx-auto space-y-6">
+            <div className="flex items-center justify-between">
               <div>
-                <h3 className={`text-base font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Active Venue Conflicts & Audit Log</h3>
-                <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'} mt-0.5`}>Real-time detection of overlapping venue assignments including warmup and teardown buffers.</p>
+                <h2 className="text-xl font-bold">{editingScheduleId ? 'Edit Event Schedule' : 'Schedule Quick Actions'}</h2>
+                <p className="text-xs text-slate-400">Configure contest logistics, venue allocation, and travel budget parameters.</p>
+              </div>
+              <button onClick={() => setActiveTab('dashboard')} className="text-xs text-slate-400 hover:text-white">Back to Dashboard</button>
+            </div>
+
+            <form onSubmit={handleScheduleSubmit} className={`${darkMode ? 'bg-slate-950/60 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-2xl p-6 shadow-xl space-y-6`}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">Sport</label>
+                  <select value={formData.sport} onChange={(e) => handleSportChange(e.target.value)} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
+                    {Object.keys(sportConfigs).length > 0 ? (
+                      Object.keys(sportConfigs).map(s => <option key={s} value={s}>{s}</option>)
+                    ) : (
+                      <option value="Football">Football</option>
+                    )}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">Location Type</label>
+                  <select value={formData.locationType} onChange={(e) => handleLocationTypeChange(e.target.value)} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
+                    <option value="Home">Home Contest</option>
+                    <option value="Away">Away Contest</option>
+                    <option value="Neutral">Neutral Site</option>
+                    <option value="Tournament">Tournament Hosting</option>
+                    <option value="Postseason">Postseason (Tentative)</option>
+                  </select>
+                </div>
               </div>
 
-              <div className="space-y-3">
-                {activeConflictsList.length === 0 ? (
-                  <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border rounded-2xl p-8 text-center`}>
-                    <CheckCircle className="w-10 h-10 text-emerald-500 mx-auto mb-3"/>
-                    <h4 className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Zero Venue Conflicts Detected</h4>
-                    <p className="text-xs text-slate-400 mt-1">All scheduled athletic contests comply with facility availability rules.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">Opponent</label>
+                  <select value={formData.opponent} onChange={(e) => handleOpponentOrTripChange({ opponent: e.target.value })} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
+                    <option value="">-- Select Opponent --</option>
+                    {opponents.map(o => <option key={o.id} value={o.name}>{o.name} ({o.location})</option>)}
+                  </select>
+                </div>
+                {formData.locationType === 'Home' || formData.locationType === 'Tournament' ? (
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Assigned Venue</label>
+                    <select value={formData.venueId} onChange={(e) => setFormData({...formData, venueId: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
+                      {venues.map(v => <option key={v.id} value={v.id}>{v.name} ({v.type})</option>)}
+                    </select>
                   </div>
                 ) : (
-                  activeConflictsList.map(c => (
-                    <div key={c.id} className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl flex items-start space-x-3 text-rose-400">
-                      <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5"/>
-                      <div>
-                        <h4 className="text-sm font-bold">{c.title}</h4>
-                        <p className="text-xs mt-0.5 text-slate-300">{c.desc}</p>
-                      </div>
-                    </div>
-                  ))
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Neutral / Destination Name</label>
+                    <input type="text" value={formData.neutralLocationName} onChange={(e) => setFormData({...formData, neutralLocationName: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="City or Stadium" />
+                  </div>
                 )}
               </div>
-            </div>
-          )}
 
-        </main>
-      </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">Date</label>
+                  <input type="date" value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">Start Time</label>
+                  <input type="time" value={formData.time} onChange={(e) => setFormData({...formData, time: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                </div>
+              </div>
+
+              {formData.locationType !== 'Home' && (
+                <div className={`${darkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'} border rounded-xl p-4 space-y-4`}>
+                  <h4 className="font-semibold text-xs text-indigo-400 uppercase tracking-wider">Travel & Lodging Logistics</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1">Travel Mode</label>
+                      <select value={formData.travelMode} onChange={(e) => handleOpponentOrTripChange({ travelMode: e.target.value })} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
+                        <option value="">-- Select Mode --</option>
+                        {transportModes.map(tm => <option key={tm.id} value={tm.modeName}>{tm.modeName}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1">Travel Party Size</label>
+                      <input type="number" value={formData.travelPartySize} onChange={(e) => handleOpponentOrTripChange({ travelPartySize: Number(e.target.value) })} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-2 pt-2">
+                    <input type="checkbox" id="overnight" checked={formData.overnightTravel} onChange={(e) => handleOpponentOrTripChange({ overnightTravel: e.target.checked })} className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4" />
+                    <label htmlFor="overnight" className="text-xs font-semibold">Overnight Stay Required</label>
+                  </div>
+
+                  {formData.overnightTravel && (
+                    <div className="grid grid-cols-2 gap-4 pt-2">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 mb-1">Hotel Rooms Count</label>
+                        <input type="number" value={formData.hotelRoomsCount} onChange={(e) => handleOpponentOrTripChange({ hotelRoomsCount: Number(e.target.value) })} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 mb-1">Cost Per Room / Night ($)</label>
+                        <input type="number" value={formData.customHotelCostPerNight} onChange={(e) => handleOpponentOrTripChange({ customHotelCostPerNight: Number(e.target.value) })} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">Notes / Additional Info</label>
+                <textarea rows="2" value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="Special broadcast requirements, uniform color, etc." />
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-4 border-t border-slate-800">
+                <button type="button" onClick={() => setActiveTab('dashboard')} className="px-4 py-2 text-xs font-semibold text-slate-400">Cancel</button>
+                <button type="submit" className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-indigo-600/30">
+                  {editingScheduleId ? 'Update Schedule Entry' : 'Submit for Review'}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* TAB 3: MASTER VENUE MATRIX CALENDAR */}
+        {activeTab === 'calendar' && (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-xl font-bold">Master Venue Side-by-Side Matrix</h2>
+              <p className="text-xs text-slate-400">Visual calendar representation of facility allocations and schedule overlaps.</p>
+            </div>
+
+            <div className={`${darkMode ? 'bg-slate-950/60 border-slate-800' : 'bg-white border-slate-200'} border rounded-2xl p-6 shadow-sm overflow-x-auto`}>
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                {venues.map(venue => (
+                  <div key={venue.id} className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200'} border rounded-xl p-4 flex flex-col space-y-3`}>
+                    <div className="border-b border-slate-800 pb-2">
+                      <h4 className="font-bold text-sm text-indigo-400">{venue.name}</h4>
+                      <p className="text-xs text-slate-400">{venue.type} • Cap: {venue.capacity}</p>
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      {schedules.filter(s => s.venueId === venue.id && s.status !== 'Rejected').length === 0 ? (
+                        <p className="text-xs text-slate-500 italic py-4 text-center">No events scheduled</p>
+                      ) : (
+                        schedules.filter(s => s.venueId === venue.id && s.status !== 'Rejected').map(ev => (
+                          <div key={ev.id} className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300'} border rounded-lg p-3 text-xs space-y-1 shadow-sm`}>
+                            <div className="font-bold text-indigo-300">{ev.sport} vs {ev.opponent}</div>
+                            <div className="text-slate-400">{formatDateDisplay(ev.date)} @ {formatTimeDisplay(ev.time)}</div>
+                            <span className="inline-block px-2 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-400">{ev.status}</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 4: VENUES */}
+        {activeTab === 'venues' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold">Venue Directory</h2>
+                <p className="text-xs text-slate-400">Manage athletic facilities and capacities.</p>
+              </div>
+              <button onClick={() => { setEditingVenue(null); setShowVenueModal(true); }} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold flex items-center space-x-2">
+                <Plus className="w-4 h-4" />
+                <span>Add Venue</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {venues.map(v => (
+                <div key={v.id} className={`${darkMode ? 'bg-slate-950/60 border-slate-800' : 'bg-white border-slate-200'} border rounded-2xl p-5 shadow-sm space-y-3`}>
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-bold text-base">{v.name}</h3>
+                    <button onClick={() => handleDeleteVenue(v.id)} className="text-rose-400 hover:text-rose-300 text-xs">Delete</button>
+                  </div>
+                  <p className="text-xs text-slate-400">Type: {v.type}</p>
+                  <p className="text-xs text-slate-400">Capacity: {v.capacity}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 5: OPPONENTS */}
+        {activeTab === 'opponents' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold">Master Opponent Directory</h2>
+                <p className="text-xs text-slate-400">Configure opponent travel distances, locations, and conference statuses.</p>
+              </div>
+              <button onClick={() => { setEditingOpponentId(null); setShowOpponentModal(true); }} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold flex items-center space-x-2">
+                <Plus className="w-4 h-4" />
+                <span>Add Opponent</span>
+              </button>
+            </div>
+
+            <div className={`${darkMode ? 'bg-slate-950/60 border-slate-800' : 'bg-white border-slate-200'} border rounded-2xl overflow-hidden shadow-sm`}>
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className={`${darkMode ? 'bg-slate-900 text-slate-400 border-slate-800' : 'bg-slate-100 text-slate-700 border-slate-200'} border-b text-xs uppercase`}>
+                    <th className="p-4">Opponent Name</th>
+                    <th className="p-4">Location</th>
+                    <th className="p-4">Distance (Miles)</th>
+                    <th className="p-4">Travel Time</th>
+                    <th className="p-4">Conference?</th>
+                    <th className="p-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800 text-sm">
+                  {opponents.map(o => (
+                    <tr key={o.id}>
+                      <td className="p-4 font-semibold">{o.name}</td>
+                      <td className="p-4 text-slate-300">{o.location}</td>
+                      <td className="p-4 text-slate-300">{o.distance} mi</td>
+                      <td className="p-4 text-slate-300">{o.travelTime}</td>
+                      <td className="p-4">
+                        <span className={`px-2 py-0.5 rounded text-xs font-semibold ${o.isConference ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-500/10 text-slate-400'}`}>
+                          {o.isConference ? 'Conference' : 'Non-Conf'}
+                        </span>
+                      </td>
+                      <td className="p-4 text-right space-x-2">
+                        <button onClick={() => { setEditingOpponentId(o.id); setNewOpponentData(o); setShowOpponentModal(true); }} className="p-1.5 rounded bg-slate-800 text-slate-300"><Edit3 className="w-4 h-4"/></button>
+                        <button onClick={() => handleDeleteOpponent(o.id)} className="p-1.5 rounded bg-rose-600/20 text-rose-400"><Trash2 className="w-4 h-4"/></button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 6: SPORTS CONFIG */}
+        {activeTab === 'sports' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold">Sport Configurations & Defaults</h2>
+                <p className="text-xs text-slate-400">Configure default venues, warmup times, officials costs, and sport tiers.</p>
+              </div>
+              <button onClick={() => { setEditingSportKey(null); setSportFormData({name: '', defaultVenueId: venues[0]?.id || '', defaultDuration: 2.5, warmupMinutes: 45, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 30, tier: 'Tier 2', officialsCost: 600, staffCost: 350, rosterSize: 25, studentStaffCount: 4}); setShowSportModal(true); }} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold flex items-center space-x-2">
+                <Plus className="w-4 h-4" />
+                <span>Add Sport</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Object.keys(sportConfigs).length === 0 ? (
+                <div className="col-span-full text-center py-12 text-slate-500 text-xs">No sport configurations defined yet. Click "Add Sport" to configure.</div>
+              ) : (
+                Object.entries(sportConfigs).map(([key, cfg]) => (
+                  <div key={key} className={`${darkMode ? 'bg-slate-950/60 border-slate-800' : 'bg-white border-slate-200'} border rounded-2xl p-5 shadow-sm space-y-3`}>
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-bold text-base">{cfg.name}</h3>
+                      <span className="px-2 py-0.5 rounded text-xs font-semibold bg-indigo-500/10 text-indigo-400">{cfg.tier || 'Tier 2'}</span>
+                    </div>
+                    <div className="text-xs text-slate-400 space-y-1">
+                      <p>Warmup Buffer: {cfg.warmupMinutes} mins</p>
+                      <p>Officials Cost: ${cfg.officialsCost}</p>
+                      <p>Student Staff Count: {cfg.studentStaffCount}</p>
+                    </div>
+                    <div className="flex justify-end space-x-2 pt-2">
+                      <button onClick={() => { setEditingSportKey(key); setSportFormData(cfg); setShowSportModal(true); }} className="px-3 py-1 rounded bg-slate-800 text-xs text-slate-300">Edit</button>
+                      <button onClick={() => handleDeleteSport(key)} className="px-3 py-1 rounded bg-rose-600/20 text-xs text-rose-400">Delete</button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 7: BUDGET & PROJECTIONS */}
+        {activeTab === 'budget' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold">Budget & Cost Projections</h2>
+                <p className="text-xs text-slate-400">Comprehensive departmental financial summary and staffing/transportation rates.</p>
+              </div>
+              <div className="flex space-x-2">
+                <button onClick={() => setBudgetSubTab('summary')} className={`px-4 py-2 rounded-xl text-xs font-semibold ${budgetSubTab === 'summary' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300'}`}>Dashboard Summary</button>
+                <button onClick={() => setBudgetSubTab('staffing')} className={`px-4 py-2 rounded-xl text-xs font-semibold ${budgetSubTab === 'staffing' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300'}`}>Home Staffing & Student Workers</button>
+                <button onClick={() => setBudgetSubTab('transport')} className={`px-4 py-2 rounded-xl text-xs font-semibold ${budgetSubTab === 'transport' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300'}`}>Transportation Rates</button>
+              </div>
+            </div>
+
+            {budgetSubTab === 'summary' && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                  <div className={`${darkMode ? 'bg-slate-950/60 border-slate-800' : 'bg-white border-slate-200'} border rounded-2xl p-4 shadow-sm`}>
+                    <p className="text-xs font-semibold text-slate-400 uppercase">Travel Expenses</p>
+                    <h3 className="text-xl font-bold mt-1 text-indigo-400">${budgetSummary.totalTravel.toLocaleString()}</h3>
+                  </div>
+                  <div className={`${darkMode ? 'bg-slate-950/60 border-slate-800' : 'bg-white border-slate-200'} border rounded-2xl p-4 shadow-sm`}>
+                    <p className="text-xs font-semibold text-slate-400 uppercase">Meal Expenses</p>
+                    <h3 className="text-xl font-bold mt-1 text-emerald-400">${budgetSummary.totalMeals.toLocaleString()}</h3>
+                  </div>
+                  <div className={`${darkMode ? 'bg-slate-950/60 border-slate-800' : 'bg-white border-slate-200'} border rounded-2xl p-4 shadow-sm`}>
+                    <p className="text-xs font-semibold text-slate-400 uppercase">Lodging / Hotel</p>
+                    <h3 className="text-xl font-bold mt-1 text-amber-400">${budgetSummary.totalHotel.toLocaleString()}</h3>
+                  </div>
+                  <div className={`${darkMode ? 'bg-slate-950/60 border-slate-800' : 'bg-white border-slate-200'} border rounded-2xl p-4 shadow-sm`}>
+                    <p className="text-xs font-semibold text-slate-400 uppercase">Hosting & Officials</p>
+                    <h3 className="text-xl font-bold mt-1 text-purple-400">${budgetSummary.totalHosting.toLocaleString()}</h3>
+                  </div>
+                  <div className={`${darkMode ? 'bg-slate-950/60 border-slate-800' : 'bg-white border-slate-200'} border rounded-2xl p-4 shadow-sm`}>
+                    <p className="text-xs font-semibold text-slate-400 uppercase">Student Workers</p>
+                    <h3 className="text-xl font-bold mt-1 text-rose-400">${budgetSummary.totalStudentWorkers.toLocaleString()}</h3>
+                  </div>
+                </div>
+
+                {/* SPORT BREAKDOWN */}
+                <div className={`${darkMode ? 'bg-slate-950/60 border-slate-800' : 'bg-white border-slate-200'} border rounded-2xl p-6 shadow-sm`}>
+                  <h3 className="font-bold text-base mb-4">Budget Breakdown by Sport</h3>
+                  <div className="space-y-4">
+                    {Object.keys(budgetSummary.bySport).length === 0 ? (
+                      <p className="text-xs text-slate-500">No scheduled contests to project budget.</p>
+                    ) : (
+                      Object.entries(budgetSummary.bySport).map(([sportName, data]) => (
+                        <div key={sportName} className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200'} border rounded-xl p-4 flex items-center justify-between`}>
+                          <div>
+                            <h4 className="font-bold text-sm text-indigo-400">{sportName}</h4>
+                            <p className="text-xs text-slate-400">{data.count} contests scheduled</p>
+                          </div>
+                          <div className="text-right">
+                            <span className="font-bold text-base">${(data.travel + data.meals + data.hotel + data.hosting + data.studentWorkers).toLocaleString()}</span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {budgetSubTab === 'staffing' && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-bold text-base">Student Worker & Home Staffing Roles</h3>
+                    <p className="text-xs text-slate-400">Configure hourly rates and flat rates for event staffing.</p>
+                  </div>
+                  <button onClick={() => { setEditingStaffId(null); setShowStaffModal(true); }} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold flex items-center space-x-2">
+                    <Plus className="w-4 h-4" />
+                    <span>Add Staff Role</span>
+                  </button>
+                </div>
+
+                <div className={`${darkMode ? 'bg-slate-950/60 border-slate-800' : 'bg-white border-slate-200'} border rounded-2xl p-6 shadow-sm space-y-4`}>
+                  <h4 className="font-semibold text-sm text-indigo-400">Student Worker General Settings</h4>
+                  <div className="grid grid-cols-2 gap-4 max-w-md">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1">Hourly Rate ($/hr)</label>
+                      <input type="number" step="0.5" value={studentWorkerConfig.hourlyRate} onChange={(e) => setStudentWorkerConfig({...studentWorkerConfig, hourlyRate: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1">Prep & Teardown Time (Mins)</label>
+                      <input type="number" value={studentWorkerConfig.prepAndTeardownMinutes} onChange={(e) => setStudentWorkerConfig({...studentWorkerConfig, prepAndTeardownMinutes: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {staffRoles.map(sr => (
+                    <div key={sr.id} className={`${darkMode ? 'bg-slate-950/60 border-slate-800' : 'bg-white border-slate-200'} border rounded-2xl p-5 shadow-sm space-y-2`}>
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-bold text-sm">{sr.roleName}</h4>
+                        <button onClick={() => handleDeleteStaffRole(sr.id)} className="text-rose-400 text-xs">Delete</button>
+                      </div>
+                      <p className="text-xs text-slate-400">Rate: ${sr.rateValue} ({sr.rateType})</p>
+                      {sr.rateType === 'hourly' && <p className="text-xs text-slate-400">Default Hours: {sr.defaultHours} hrs</p>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {budgetSubTab === 'transport' && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-base">Transportation Rate Options</h3>
+                  <button onClick={() => { setEditingTransportId(null); setShowTransportModal(true); }} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold flex items-center space-x-2">
+                    <Plus className="w-4 h-4" />
+                    <span>Add Transport Mode</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {transportModes.map(tm => (
+                    <div key={tm.id} className={`${darkMode ? 'bg-slate-950/60 border-slate-800' : 'bg-white border-slate-200'} border rounded-2xl p-5 shadow-sm space-y-2`}>
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-bold text-sm">{tm.modeName}</h4>
+                        <button onClick={() => handleDeleteTransportMode(tm.id)} className="text-rose-400 text-xs">Delete</button>
+                      </div>
+                      <p className="text-xs text-slate-400">Rate Type: {tm.rateType}</p>
+                      <p className="text-xs text-slate-400">Value: ${tm.rateValue}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 8: CONFLICT AUDIT */}
+        {activeTab === 'conflicts' && (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-xl font-bold">Conflict Audit & Venue Double-Bookings</h2>
+              <p className="text-xs text-slate-400">Review venue clashes and warmup buffer overlaps across sports.</p>
+            </div>
+
+            <div className={`${darkMode ? 'bg-slate-950/60 border-slate-800' : 'bg-white border-slate-200'} border rounded-2xl p-6 shadow-sm space-y-4`}>
+              {activeConflictsList.length === 0 ? (
+                <div className="text-center py-12 text-emerald-400 text-sm font-semibold flex flex-col items-center space-y-2">
+                  <CheckCircle className="w-8 h-8" />
+                  <span>No schedule or venue conflicts detected!</span>
+                </div>
+              ) : (
+                activeConflictsList.map((cf) => (
+                  <div key={cf.id} className="bg-rose-500/10 border border-rose-500/20 rounded-xl p-4 flex items-start space-x-3 text-rose-300">
+                    <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="font-bold text-sm">{cf.title}</h4>
+                      <p className="text-xs mt-1">{cf.desc}</p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+      </main>
 
     </div>
   );
