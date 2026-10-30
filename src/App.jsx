@@ -200,7 +200,7 @@ export default function App() {
     sport: 'Football',
     coachName: 'Coach Marcus Vance',
     opponent: '',
-    locationType: 'Home', // Home, Away, Neutral, Tournament, Postseason
+    locationType: 'Home', // Home, Away, Neutral, Home Tournament, Road Tournament, Postseason
     venueId: 'v1',
     date: '',
     time: '14:00',
@@ -381,7 +381,8 @@ export default function App() {
         venueId: config.defaultVenueId || prev.venueId,
         durationHours: config.defaultDuration || 2.5,
         warmupMinutes: config.warmupMinutes || 45,
-        teardownMinutes: config.teardownMinutes || 30
+        teardownMinutes: config.teardownMinutes || 30,
+        travelPartySize: config.rosterSize || 30
       }));
     }
   };
@@ -454,10 +455,48 @@ export default function App() {
   };
 
   const handleLocationTypeChange = (locType) => {
-    const isHome = locType === 'Home';
-    const config = sportConfigs[formData.sport];
-    const venueId = isHome ? (config ? config.defaultVenueId : 'v1') : 'Away';
+    const isHome = locType === 'Home' || locType === 'Home Tournament';
+    const config = sportConfigs[formData.sport] || sportConfigs['Football'] || {};
+    const venueId = isHome ? (config.defaultVenueId || 'v1') : 'Away';
     handleOpponentOrTripChange({ locationType: locType, venueId, teardownMinutes: isHome ? 0 : 30 });
+  };
+
+  // Quick initiate event addition with preset location type
+  const openAddEventWithType = (locType) => {
+    const defaultSport = role === 'coach' ? currentUserSport : 'Football';
+    const config = sportConfigs[defaultSport] || {};
+    const isHome = locType === 'Home' || locType === 'Home Tournament';
+    
+    setEditingScheduleId(null);
+    setFormData({
+      sport: defaultSport,
+      coachName: role === 'coach' ? `Coach (${defaultSport})` : 'Coach Marcus Vance',
+      opponent: opponents[0]?.name || '',
+      locationType: locType,
+      venueId: isHome ? (config.defaultVenueId || 'v1') : 'Away',
+      date: '',
+      time: '14:00',
+      durationHours: config.defaultDuration || 2.5,
+      warmupMinutes: config.warmupMinutes || 45,
+      teardownMinutes: isHome ? 0 : (config.teardownMinutes || 30),
+      travelCost: 0,
+      mealCost: 0,
+      hotelCost: 0,
+      hostingCost: config.officialsCost || 3500,
+      overnightTravel: false,
+      travelPartySize: config.rosterSize || 30,
+      travelMode: 'Charter Bus',
+      hotelRoomsCount: Math.ceil((config.rosterSize || 30) / 2),
+      customHotelCostPerNight: 160,
+      departureDate: '',
+      departureTime: '',
+      returnDate: '',
+      returnTime: '',
+      tournamentDetails: '',
+      neutralLocationName: '',
+      notes: ''
+    });
+    setActiveTab('submit');
   };
 
   const handleEditScheduleClick = (ev) => {
@@ -823,14 +862,15 @@ export default function App() {
     }
 
     const selectedVenue = venues.find(v => v.id === formData.venueId);
-    const venueName = formData.locationType === 'Home' && selectedVenue ? selectedVenue.name : (formData.locationType === 'Neutral' ? 'Neutral Site' : 'Away Contest');
+    const isHomeType = formData.locationType === 'Home' || formData.locationType === 'Home Tournament';
+    const venueName = isHomeType && selectedVenue ? selectedVenue.name : (formData.locationType === 'Neutral' ? (formData.neutralLocationName || 'Neutral Site') : 'Away Contest');
     const sportConfig = sportConfigs[formData.sport] || {};
 
     const submissionPayload = {
       ...formData,
       venueName,
       warmupMinutes: sportConfig.warmupMinutes || 45,
-      teardownMinutes: sportConfig.teardownMinutes || 30,
+      teardownMinutes: isHomeType ? 0 : (sportConfig.teardownMinutes || 30),
       status: formData.locationType === 'Postseason' ? 'Tentative' : (role === 'admin' ? 'Approved' : 'Pending')
     };
 
@@ -1291,6 +1331,37 @@ export default function App() {
                 </div>
               </div>
 
+              {/* Quick Action Event Creation Bar */}
+              <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'} border rounded-2xl p-5 shadow-sm`}>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-400 mb-3">Quick Add Schedule Event</h4>
+                <div className="flex flex-wrap gap-2.5">
+                  <label className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold cursor-pointer shadow flex items-center gap-1.5">
+                    <Plus className="w-3.5 h-3.5"/> Import from CSV
+                    <input type="file" accept=".csv" onChange={handleCSVImport} className="hidden" />
+                  </label>
+                  <button onClick={() => openAddEventWithType('Home')} className={`px-3.5 py-2 rounded-xl text-xs font-semibold border ${darkMode ? 'bg-slate-900 border-slate-700 text-slate-200 hover:bg-slate-800' : 'bg-slate-100 border-slate-300 text-slate-800 hover:bg-slate-200'}`}>
+                    + Add Home Event
+                  </button>
+                  <button onClick={() => openAddEventWithType('Away')} className={`px-3.5 py-2 rounded-xl text-xs font-semibold border ${darkMode ? 'bg-slate-900 border-slate-700 text-slate-200 hover:bg-slate-800' : 'bg-slate-100 border-slate-300 text-slate-800 hover:bg-slate-200'}`}>
+                    + Add Road Event
+                  </button>
+                  <button onClick={() => openAddEventWithType('Neutral')} className={`px-3.5 py-2 rounded-xl text-xs font-semibold border ${darkMode ? 'bg-slate-900 border-slate-700 text-slate-200 hover:bg-slate-800' : 'bg-slate-100 border-slate-300 text-slate-800 hover:bg-slate-200'}`}>
+                    + Add Neutral Site Event
+                  </button>
+                  <button onClick={() => openAddEventWithType('Home Tournament')} className={`px-3.5 py-2 rounded-xl text-xs font-semibold border ${darkMode ? 'bg-slate-900 border-slate-700 text-slate-200 hover:bg-slate-800' : 'bg-slate-100 border-slate-300 text-slate-800 hover:bg-slate-200'}`}>
+                    + Add Home Tournament
+                  </button>
+                  <button onClick={() => openAddEventWithType('Road Tournament')} className={`px-3.5 py-2 rounded-xl text-xs font-semibold border ${darkMode ? 'bg-slate-900 border-slate-700 text-slate-200 hover:bg-slate-800' : 'bg-slate-100 border-slate-300 text-slate-800 hover:bg-slate-200'}`}>
+                    + Add Road Tournament
+                  </button>
+                  {role === 'admin' && (
+                    <button onClick={() => openAddEventWithType('Postseason')} className="px-3.5 py-2 bg-purple-600/20 border border-purple-500/30 text-purple-300 hover:bg-purple-600/30 rounded-xl text-xs font-semibold">
+                      + Add Postseason (Admin)
+                    </button>
+                  )}
+                </div>
+              </div>
+
               <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'} border rounded-2xl p-6`}>
                 <div className="flex items-center justify-between mb-4">
                   <h3 className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Recent Schedule Submissions</h3>
@@ -1354,27 +1425,15 @@ export default function App() {
           {activeTab === 'submit' && (
             <div className={`max-w-3xl mx-auto ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-2xl p-6 shadow-xl space-y-6`}>
               
-              {/* CSV Importer */}
-              <div className={`p-4 ${darkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'} border rounded-xl flex flex-col md:flex-row items-center justify-between gap-4`}>
-                <div>
-                  <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wide">Bulk CSV Schedule Importer</h4>
-                  <p className="text-[11px] text-slate-400 mt-0.5">Format: Sport, Opponent, LocationType, VenueName, Date (YYYY-MM-DD), Time, Notes</p>
-                </div>
-                <label className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold cursor-pointer shadow">
-                  Upload CSV File
-                  <input type="file" accept=".csv" onChange={handleCSVImport} className="hidden" />
-                </label>
-              </div>
-
               <div>
                 <h3 className="text-base font-bold">
-                  {editingScheduleId ? 'Edit Schedule Event' : (role === 'admin' ? 'Administrative Master Schedule Entry' : `Submit Schedule for ${currentUserSport}`)}
+                  {editingScheduleId ? 'Edit Schedule Event' : `Add ${formData.locationType} Event (${formData.sport})`}
                 </h3>
-                <p className="text-xs text-slate-400 mt-0.5">Enter contest details below to evaluate venue availability and projected travel/hosting budgets.</p>
+                <p className="text-xs text-slate-400 mt-0.5">Configure event parameters for venue allocation and budget forecasting.</p>
               </div>
 
               <form onSubmit={handleScheduleSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-xs font-semibold text-slate-400 mb-1">Sport</label>
                     <select value={formData.sport} onChange={(e) => handleSportChange(e.target.value)} disabled={role === 'coach'} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
@@ -1383,51 +1442,48 @@ export default function App() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Coach / Submitter</label>
-                    <input type="text" value={formData.coachName} onChange={(e) => setFormData({...formData, coachName: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Opponent</label>
-                    <div className="flex gap-2">
-                      <select value={formData.opponent} onChange={(e) => handleOpponentOrTripChange({ opponent: e.target.value })} className={`flex-1 ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
-                        {opponents.map(o => <option key={o.id} value={o.name}>{o.name} ({o.isConference ? 'Conf' : 'Non-Conf'})</option>)}
-                      </select>
-                      <button type="button" onClick={() => setShowOpponentModal(true)} className="px-3 py-2 bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 rounded-xl text-xs font-semibold">
-                        + New
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Location Type</label>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Event Type / Location</label>
                     <select value={formData.locationType} onChange={(e) => handleLocationTypeChange(e.target.value)} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
                       <option value="Home">Home</option>
                       <option value="Away">Away</option>
                       <option value="Neutral">Neutral Site</option>
-                      <option value="Tournament">Tournament Hosting</option>
-                      <option value="Postseason">Tentative Postseason</option>
+                      <option value="Home Tournament">Home Tournament</option>
+                      <option value="Road Tournament">Road Tournament</option>
+                      {role === 'admin' && <option value="Postseason">Postseason (Tentative)</option>}
                     </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Opponent Institution</label>
+                    <div className="flex gap-2">
+                      <select value={formData.opponent} onChange={(e) => handleOpponentOrTripChange({ opponent: e.target.value })} className={`flex-1 ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
+                        {opponents.map(o => <option key={o.id} value={o.name}>{o.name}</option>)}
+                      </select>
+                      <button type="button" onClick={() => setShowOpponentModal(true)} className="px-2.5 py-2 bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 rounded-xl text-xs font-semibold">
+                        + New
+                      </button>
+                    </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {formData.locationType === 'Home' || formData.locationType === 'Tournament' ? (
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-400 mb-1">Assigned Venue</label>
-                      <select value={formData.venueId} onChange={(e) => setFormData({...formData, venueId: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
-                        {venues.map(v => <option key={v.id} value={v.id}>{v.name} ({v.type})</option>)}
-                      </select>
-                    </div>
-                  ) : (
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-400 mb-1">Destination</label>
-                      <input type="text" disabled value="Opponent Location" className={`w-full ${darkMode ? 'bg-slate-900/50 border-slate-800 text-slate-500' : 'bg-slate-100 border-slate-200 text-slate-400'} border rounded-xl px-3 py-2 text-sm`} />
-                    </div>
-                  )}
+                {/* Venue selector for Home / Home Tournament */}
+                {(formData.locationType === 'Home' || formData.locationType === 'Home Tournament') && (
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Assigned Home Venue</label>
+                    <select value={formData.venueId} onChange={(e) => setFormData({...formData, venueId: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
+                      {venues.map(v => <option key={v.id} value={v.id}>{v.name} ({v.type})</option>)}
+                    </select>
+                  </div>
+                )}
 
+                {formData.locationType === 'Neutral' && (
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Neutral Facility / Location Name</label>
+                    <input type="text" value={formData.neutralLocationName} onChange={(e) => setFormData({...formData, neutralLocationName: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="e.g. City Convention Center Arena" />
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-semibold text-slate-400 mb-1">Date</label>
                     <input type="date" required value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
@@ -1439,24 +1495,10 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className={`grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Duration (Hours)</label>
-                    <input type="number" step="0.5" value={formData.durationHours} onChange={(e) => setFormData({...formData, durationHours: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Warmup Buffer (Auto)</label>
-                    <input type="text" disabled value={`${(sportConfigs[formData.sport] || {}).warmupMinutes || 45} mins`} className={`w-full ${darkMode ? 'bg-slate-900/50 border-slate-800 text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-500'} border rounded-xl px-3 py-2 text-sm`} />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Teardown Buffer (Auto)</label>
-                    <input type="text" disabled value={`${(sportConfigs[formData.sport] || {}).teardownMinutes || 30} mins`} className={`w-full ${darkMode ? 'bg-slate-900/50 border-slate-800 text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-500'} border rounded-xl px-3 py-2 text-sm`} />
-                  </div>
-                </div>
-
-                {formData.locationType === 'Away' && (
-                  <div className={`p-4 ${darkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'} border rounded-xl space-y-3`}>
-                    <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wide">Travel & Budget Parameters</h4>
+                {/* Away or Road Tournament Specific Travel Parameters */}
+                {(formData.locationType === 'Away' || formData.locationType === 'Road Tournament') && (
+                  <div className={`p-4 ${darkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'} border rounded-xl space-y-4`}>
+                    <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wide">Travel & Transportation Parameters</h4>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
                         <label className="block text-xs font-semibold text-slate-400 mb-1">Travel Party Size</label>
@@ -1465,9 +1507,7 @@ export default function App() {
                       <div>
                         <label className="block text-xs font-semibold text-slate-400 mb-1">Travel Mode</label>
                         <select value={formData.travelMode} onChange={(e) => setFormData({...formData, travelMode: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
-                          <option value="Charter Bus">Charter Bus</option>
-                          <option value="Commercial Flight">Commercial Flight</option>
-                          <option value="Van Fleet">Van Fleet</option>
+                          {transportModes.map(tm => <option key={tm.id} value={tm.modeName}>{tm.modeName}</option>)}
                         </select>
                       </div>
                       <div className="flex items-center pt-5">
@@ -1479,18 +1519,16 @@ export default function App() {
                 )}
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Notes / Special Requirements</label>
-                  <textarea rows="2" value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="Broadcast needs, equipment truck, etc."></textarea>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">Special Notes / Requirements</label>
+                  <textarea rows="2" value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="Broadcast schedule, equipment transport, etc."></textarea>
                 </div>
 
                 <div className="flex justify-end space-x-3 pt-4">
-                  {editingScheduleId && (
-                    <button type="button" onClick={() => { setEditingScheduleId(null); setActiveTab('dashboard'); }} className="px-4 py-2.5 bg-slate-800 text-slate-300 rounded-xl text-xs font-semibold">
-                      Cancel
-                    </button>
-                  )}
+                  <button type="button" onClick={() => { setEditingScheduleId(null); setActiveTab('dashboard'); }} className="px-4 py-2.5 bg-slate-800 text-slate-300 rounded-xl text-xs font-semibold">
+                    Cancel
+                  </button>
                   <button type="submit" className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-lg">
-                    {editingScheduleId ? 'Update Schedule Event' : (role === 'admin' ? 'Save Master Schedule Event' : 'Submit Schedule for Review')}
+                    {editingScheduleId ? 'Update Event' : 'Save Event to Master Schedule'}
                   </button>
                 </div>
               </form>
@@ -1861,6 +1899,18 @@ export default function App() {
                       <input type="number" value={studentWorkerConfig.prepAndTeardownMinutes} onChange={(e) => setStudentWorkerConfig({...studentWorkerConfig, prepAndTeardownMinutes: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="e.g. 90 minutes" />
                       <p className="text-[10px] text-slate-500 mt-1">This time is automatically added to each sport's contest length for total student worker payroll calculation.</p>
                     </div>
+                  </div>
+                  <div className="pt-4 flex justify-end">
+                    <button onClick={async () => {
+                      try {
+                        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'studentWorkers'), studentWorkerConfig);
+                        showNotice('Student worker settings saved to cloud database!');
+                      } catch (e) {
+                        showNotice('Student worker settings saved locally.');
+                      }
+                    }} className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow">
+                      Save Student Worker Settings
+                    </button>
                   </div>
                 </div>
               ) : (
