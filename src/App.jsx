@@ -153,6 +153,8 @@ export default function App() {
   
   const [activeTab, setActiveTab] = useState('dashboard');
   const [editingScheduleId, setEditingScheduleId] = useState(null);
+  const [changeReason, setChangeReason] = useState('');
+  const [originalApprovedSnapshot, setOriginalApprovedSnapshot] = useState(null);
 
   // Modal display states
   const [showVenueModal, setShowVenueModal] = useState(false);
@@ -521,6 +523,8 @@ export default function App() {
 
   const handleEditScheduleClick = (ev) => {
     setEditingScheduleId(ev.id);
+    setChangeReason('');
+    setOriginalApprovedSnapshot(ev.status === 'Approved' ? { ...ev } : (ev.originalApprovedSnapshot || null));
     setFormData({
       sport: ev.sport || 'Football',
       coachName: ev.coachName || '',
@@ -544,7 +548,7 @@ export default function App() {
       departureDate: ev.departureDate || '',
       departureTime: ev.departureTime || '',
       returnDate: ev.returnDate || '',
-      returnTime: ev.returnTime || '',
+      returnTime: '',
       tournamentDetails: ev.tournamentDetails || '',
       neutralLocationName: ev.neutralLocationName || '',
       notes: ev.notes || ''
@@ -918,6 +922,11 @@ export default function App() {
       return;
     }
 
+    if (editingScheduleId && originalApprovedSnapshot && !changeReason.trim()) {
+      showNotice('Please provide a reason for changing an approved schedule.', 'error');
+      return;
+    }
+
     const selectedVenue = venues.find(v => v.id === formData.venueId);
     const isHomeType = formData.locationType === 'Home' || formData.locationType === 'Home Tournament';
     const venueName = isHomeType && selectedVenue ? selectedVenue.name : (formData.locationType === 'Neutral' ? (formData.neutralLocationName || 'Neutral Site') : 'Away Contest');
@@ -928,7 +937,9 @@ export default function App() {
       venueName,
       warmupMinutes: sportConfig.warmupMinutes || 45,
       teardownMinutes: isHomeType ? 0 : (sportConfig.teardownMinutes || 30),
-      status: formData.locationType === 'Postseason' ? 'Tentative' : (role === 'admin' ? 'Approved' : 'Pending')
+      status: formData.locationType === 'Postseason' ? 'Tentative' : (role === 'admin' ? 'Approved' : 'Pending'),
+      changeReason: changeReason.trim() ? changeReason : undefined,
+      originalApprovedSnapshot: originalApprovedSnapshot || undefined
     };
 
     const conflicts = checkConflictsForEvent(submissionPayload, schedules, editingScheduleId);
@@ -957,6 +968,8 @@ export default function App() {
       showNotice('Schedule saved locally / offline.');
     }
     setEditingScheduleId(null);
+    setOriginalApprovedSnapshot(null);
+    setChangeReason('');
     setActiveTab(role === 'admin' ? 'dashboard' : 'calendar');
   };
 
@@ -1527,6 +1540,17 @@ export default function App() {
               </div>
 
               <form onSubmit={handleScheduleSubmit} className="space-y-4">
+                {editingScheduleId && originalApprovedSnapshot && (
+                  <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-2">
+                    <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wide">Modifying Previously Approved Event</h4>
+                    <p className="text-xs text-slate-300">You are editing a schedule that was already approved. Please provide a clear explanation for this change so the administration can review it.</p>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1">Reason for Change (Required)</label>
+                      <input type="text" required value={changeReason} onChange={(e) => setChangeReason(e.target.value)} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="e.g. Opponent requested time change due to travel delay" />
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-xs font-semibold text-slate-400 mb-1">Sport</label>
@@ -1551,33 +1575,35 @@ export default function App() {
                     <label className="block text-xs font-semibold text-slate-400 mb-1">Opponent Institution</label>
                     <div className="flex gap-2">
                       <select value={formData.opponent} onChange={(e) => handleOpponentOrTripChange({ opponent: e.target.value })} className={`flex-1 ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
+                        <option value="">Select Opponent</option>
                         {opponents.map(o => <option key={o.id} value={o.name}>{o.name}</option>)}
                       </select>
-                      <button type="button" onClick={() => setShowOpponentModal(true)} className="px-2.5 py-2 bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 rounded-xl text-xs font-semibold">
-                        + New
-                      </button>
                     </div>
                   </div>
                 </div>
 
-                {/* Venue selector for Home / Home Tournament */}
-                {(formData.locationType === 'Home' || formData.locationType === 'Home Tournament') && (
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Assigned Home Venue</label>
-                    <select value={formData.venueId} onChange={(e) => setFormData({...formData, venueId: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
-                      {venues.map(v => <option key={v.id} value={v.id}>{v.name} ({v.type})</option>)}
-                    </select>
-                  </div>
-                )}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {formData.locationType === 'Home' || formData.locationType === 'Home Tournament' ? (
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1">Home Venue</label>
+                      <select value={formData.venueId} onChange={(e) => setFormData({...formData, venueId: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
+                        {venues.map(v => <option key={v.id} value={v.id}>{v.name} ({v.type})</option>)}
+                      </select>
+                    </div>
+                  ) : formData.locationType === 'Neutral' ? (
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1">Neutral Site Name</label>
+                      <input type="text" value={formData.neutralLocationName} onChange={(e) => setFormData({...formData, neutralLocationName: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="e.g. City Convention Center" />
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1">Travel Mode</label>
+                      <select value={formData.travelMode} onChange={(e) => handleOpponentOrTripChange({ travelMode: e.target.value })} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
+                        {transportModes.map(tm => <option key={tm.id} value={tm.modeName}>{tm.modeName}</option>)}
+                      </select>
+                    </div>
+                  )}
 
-                {formData.locationType === 'Neutral' && (
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Neutral Facility / Location Name</label>
-                    <input type="text" value={formData.neutralLocationName} onChange={(e) => setFormData({...formData, neutralLocationName: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="e.g. City Convention Center Arena" />
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-semibold text-slate-400 mb-1">Date</label>
                     <input type="date" required value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
@@ -1589,40 +1615,37 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Away or Road Tournament Specific Travel Parameters */}
-                {(formData.locationType === 'Away' || formData.locationType === 'Road Tournament') && (
-                  <div className={`p-4 ${darkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'} border rounded-xl space-y-4`}>
-                    <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wide">Travel & Transportation Parameters</h4>
+                {formData.locationType !== 'Home' && formData.locationType !== 'Home Tournament' && (
+                  <div className={`p-4 ${darkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-slate-50 border-slate-200'} border rounded-xl space-y-4`}>
+                    <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wide">Road / Neutral Travel Parameters</h4>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
                         <label className="block text-xs font-semibold text-slate-400 mb-1">Travel Party Size</label>
-                        <input type="number" value={formData.travelPartySize} onChange={(e) => handleOpponentOrTripChange({ travelPartySize: Number(e.target.value) })} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                        <input type="number" value={formData.travelPartySize} onChange={(e) => handleOpponentOrTripChange({ travelPartySize: Number(e.target.value) })} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
                       </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-400 mb-1">Travel Mode</label>
-                        <select value={formData.travelMode} onChange={(e) => setFormData({...formData, travelMode: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
-                          {transportModes.map(tm => <option key={tm.id} value={tm.modeName}>{tm.modeName}</option>)}
-                        </select>
+                      <div className="flex items-center space-x-2 pt-6">
+                        <input type="checkbox" id="overnight" checked={formData.overnightTravel} onChange={(e) => handleOpponentOrTripChange({ overnightTravel: e.target.checked })} className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4" />
+                        <label htmlFor="overnight" className="text-xs font-semibold">Overnight Stay Required</label>
                       </div>
-                      <div className="flex items-center pt-5">
-                        <input type="checkbox" id="overnight" checked={formData.overnightTravel} onChange={(e) => handleOpponentOrTripChange({ overnightTravel: e.target.checked })} className="rounded text-indigo-600 w-4 h-4" />
-                        <label htmlFor="overnight" className="ml-2 text-xs font-medium">Overnight Trip (Hotel & Meals)</label>
-                      </div>
+                      {formData.overnightTravel && (
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 mb-1">Hotel Rooms Count</label>
+                          <input type="number" value={formData.hotelRoomsCount} onChange={(e) => handleOpponentOrTripChange({ hotelRoomsCount: Number(e.target.value) })} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Special Notes / Requirements</label>
-                  <textarea rows="2" value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="Broadcast schedule, equipment transport, etc."></textarea>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">Special Notes / Details</label>
+                  <textarea value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} rows={2} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="Add any special notes..." />
                 </div>
 
-                <div className="flex justify-end space-x-3 pt-4">
-                  <button type="button" onClick={() => { setEditingScheduleId(null); setActiveTab('dashboard'); }} className="px-4 py-2.5 bg-slate-800 text-slate-300 rounded-xl text-xs font-semibold">
-                    Cancel
-                  </button>
-                  <button type="submit" className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-lg">
-                    {editingScheduleId ? 'Update Event' : 'Save Event to Master Schedule'}
+                <div className="flex justify-end space-x-3 pt-3">
+                  <button type="button" onClick={() => setActiveTab('dashboard')} className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white">Cancel</button>
+                  <button type="submit" className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow">
+                    {editingScheduleId ? 'Update Schedule Event' : 'Save & Submit Event'}
                   </button>
                 </div>
               </form>
