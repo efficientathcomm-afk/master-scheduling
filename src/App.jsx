@@ -1,17 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  Calendar, Clock, MapPin, DollarSign, Users, Shield, AlertTriangle, 
-  CheckCircle, XCircle, Plus, Filter, Search, ChevronRight, Download, 
-  Bus, Utensils, Award, FileText, Settings, RefreshCw, Layers, Check, X,
-  Grid, Globe, Compass, Briefcase, Eye, Edit3, Trash2, Cloud, CloudOff, Award as Trophy, Send, Sun, Moon
-} from 'lucide-react';
-
-// --- FIREBASE IMPORTS ---
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
-import { 
-  getFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot 
-} from 'firebase/firestore';
+import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, addDoc } from 'firebase/firestore';
+import { Trophy, Calendar, Users, MapPin, DollarSign, AlertTriangle, CheckCircle, XCircle, Plus, Edit3, Trash2, Check, X, Layers, Award, Moon, Sun, ChevronRight, Grid } from 'lucide-react';
 
 // --- FIREBASE INITIALIZATION ---
 const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
@@ -105,57 +96,91 @@ const INITIAL_SCHEDULES = [
 export default function App() {
   const [user, setUser] = useState(null);
   const [authReady, setAuthReady] = useState(false);
-  const [syncStatus, setSyncStatus] = useState('Local Mode Active');
+  const [syncStatus, setSyncStatus] = useState('Connecting to Cloud...');
   const [darkMode, setDarkMode] = useState(true);
 
   // Application State
   const [role, setRole] = useState('admin');
   const [currentUserSport, setCurrentUserSport] = useState('Football');
   const [schedules, setSchedules] = useState(INITIAL_SCHEDULES);
-  
-  // Initialize from localStorage or fallback
-  const [venues, setVenues] = useState(() => {
-    const saved = localStorage.getItem('cas_venues');
-    return saved ? JSON.parse(saved) : INITIAL_VENUES;
-  });
-
-  const [opponents, setOpponents] = useState(() => {
-    const saved = localStorage.getItem('cas_opponents');
-    return saved ? JSON.parse(saved) : INITIAL_OPPONENTS;
-  });
-
-  const [sportConfigs, setSportConfigs] = useState(() => {
-    const saved = localStorage.getItem('cas_sportConfigs');
-    return saved ? JSON.parse(saved) : INITIAL_SPORT_CONFIGS;
-  });
-
-  const [staffRoles, setStaffRoles] = useState(() => {
-    const saved = localStorage.getItem('cas_staffRoles');
-    return saved ? JSON.parse(saved) : INITIAL_STAFF_ROLES;
-  });
-
-  const [transportModes, setTransportModes] = useState(() => {
-    const saved = localStorage.getItem('cas_transportModes');
-    return saved ? JSON.parse(saved) : INITIAL_TRANSPORT_MODES;
-  });
-
-  const [studentWorkerConfig, setStudentWorkerConfig] = useState(() => {
-    const saved = localStorage.getItem('cas_studentWorkerConfig');
-    return saved ? JSON.parse(saved) : INITIAL_STUDENT_WORKER_SETTINGS;
-  });
+  const [venues, setVenues] = useState(INITIAL_VENUES);
+  const [opponents, setOpponents] = useState(INITIAL_OPPONENTS);
+  const [sportConfigs, setSportConfigs] = useState(INITIAL_SPORT_CONFIGS);
+  const [staffRoles, setStaffRoles] = useState(INITIAL_STAFF_ROLES);
+  const [transportModes, setTransportModes] = useState(INITIAL_TRANSPORT_MODES);
+  const [studentWorkerConfig, setStudentWorkerConfig] = useState(INITIAL_STUDENT_WORKER_SETTINGS);
   
   const [activeTab, setActiveTab] = useState('dashboard');
   const [budgetSubTab, setBudgetSubTab] = useState('summary');
   const [selectedSportDetail, setSelectedSportDetail] = useState(null);
   const [editingScheduleId, setEditingScheduleId] = useState(null);
 
-  // Persistence effects
-  useEffect(() => { localStorage.setItem('cas_venues', JSON.stringify(venues)); }, [venues]);
-  useEffect(() => { localStorage.setItem('cas_opponents', JSON.stringify(opponents)); }, [opponents]);
-  useEffect(() => { localStorage.setItem('cas_sportConfigs', JSON.stringify(sportConfigs)); }, [sportConfigs]);
-  useEffect(() => { localStorage.setItem('cas_staffRoles', JSON.stringify(staffRoles)); }, [staffRoles]);
-  useEffect(() => { localStorage.setItem('cas_transportModes', JSON.stringify(transportModes)); }, [transportModes]);
-  useEffect(() => { localStorage.setItem('cas_studentWorkerConfig', JSON.stringify(studentWorkerConfig)); }, [studentWorkerConfig]);
+  // --- FIREBASE AUTH & REAL-TIME SYNC ---
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+        setUser(auth.currentUser);
+        setAuthReady(true);
+      } catch (err) {
+        console.error("Auth error:", err);
+        setSyncStatus('Local Mode Active');
+        setAuthReady(true);
+      }
+    };
+    initAuth();
+    const unsubscribeAuth = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+    });
+    return () => unsubscribeAuth();
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    setSyncStatus('Cloud Synced');
+
+    const unsubVenues = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'venues'), (snapshot) => {
+      if (!snapshot.empty) {
+        const loaded = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setVenues(loaded);
+      }
+    }, (err) => console.error(err));
+
+    const unsubOpponents = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'opponents'), (snapshot) => {
+      if (!snapshot.empty) {
+        const loaded = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setOpponents(loaded);
+      }
+    }, (err) => console.error(err));
+
+    const unsubSports = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'sportConfigs'), (snapshot) => {
+      if (!snapshot.empty) {
+        const loaded = {};
+        snapshot.docs.forEach(doc => {
+          loaded[doc.id] = doc.data();
+        });
+        setSportConfigs(loaded);
+      }
+    }, (err) => console.error(err));
+
+    const unsubSchedules = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'schedules'), (snapshot) => {
+      if (!snapshot.empty) {
+        const loaded = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setSchedules(loaded);
+      }
+    }, (err) => console.error(err));
+
+    return () => {
+      unsubVenues();
+      unsubOpponents();
+      unsubSports();
+      unsubSchedules();
+    };
+  }, [user]);
 
   // Modals
   const [showOpponentModal, setShowOpponentModal] = useState(false);
