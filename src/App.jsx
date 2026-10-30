@@ -648,39 +648,31 @@ export default function App() {
     if (!postseasonFormData.sport) return;
     const psId = editingPostseasonId || ('ps-' + Date.now());
     const payload = { id: psId, ...postseasonFormData };
-    let updated;
+    let updatedPostseasons;
 
     if (editingPostseasonId) {
-      updated = postseasons.map(p => p.id === editingPostseasonId ? payload : p);
+      updatedPostseasons = postseasons.map(p => p.id === editingPostseasonId ? payload : p);
       showNotice('Postseason updated.');
     } else {
-      updated = [...postseasons, payload];
+      updatedPostseasons = [...postseasons, payload];
       showNotice('Postseason schedule added.');
     }
 
-    setPostseasons(updated);
-    localStorage.setItem('app_postseasons', JSON.stringify(updated));
-
-    try {
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'postseasons', psId), payload);
-    } catch (err) {}
+    setPostseasons(updatedPostseasons);
+    localStorage.setItem('app_postseasons', JSON.stringify(updatedPostseasons));
 
     setShowPostseasonModal(false);
     setEditingPostseasonId(null);
-    setPostseasonFormData({ sport: 'Football', rounds: [{ id: 'r-' + Date.now(), roundName: 'Round 1', date: '', venueId: 'v1' }] });
   };
 
   const handleDeletePostseason = async (id) => {
     const updated = postseasons.filter(p => p.id !== id);
     setPostseasons(updated);
     localStorage.setItem('app_postseasons', JSON.stringify(updated));
-    try {
-      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'postseasons', id));
-    } catch (e) {}
     showNotice('Postseason schedule removed.');
   };
 
-  const handleConfirmPostseasonRound = async (sport, roundName, date, venueId, eventType) => {
+  const handleConfirmPostseasonRound = async (sport, roundName, date, venueId, eventType, postseasonId, roundId) => {
     const venueObj = venues.find(v => v.id === venueId);
     const venueName = eventType === 'Home' ? (venueObj ? venueObj.name : 'Home Venue') : 'Away Venue';
     const config = sportConfigs[sport] || {};
@@ -710,10 +702,33 @@ export default function App() {
 
     try {
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'events'), newRecord);
-      showNotice(`Postseason round "${roundName}" confirmed as ${eventType} event and sent to Pending Submissions.`);
+      
+      // Remove confirmed round from postseason management list
+      const updatedPostseasons = postseasons.map(ps => {
+        if (ps.id === postseasonId) {
+          return { ...ps, rounds: ps.rounds.filter(r => r.id !== roundId) };
+        }
+        return ps;
+      }).filter(ps => ps.rounds.length > 0);
+
+      setPostseasons(updatedPostseasons);
+      localStorage.setItem('app_postseasons', JSON.stringify(updatedPostseasons));
+
+      showNotice(`Postseason round "${roundName}" confirmed as ${eventType} event, sent to Pending Submissions, and removed from postseason management.`);
     } catch (err) {
       setSchedules(prev => [...prev, { id: 'ps-evt-' + Date.now(), ...newRecord }]);
-      showNotice(`Postseason round "${roundName}" confirmed as ${eventType} event locally.`);
+      
+      const updatedPostseasons = postseasons.map(ps => {
+        if (ps.id === postseasonId) {
+          return { ...ps, rounds: ps.rounds.filter(r => r.id !== roundId) };
+        }
+        return ps;
+      }).filter(ps => ps.rounds.length > 0);
+
+      setPostseasons(updatedPostseasons);
+      localStorage.setItem('app_postseasons', JSON.stringify(updatedPostseasons));
+
+      showNotice(`Postseason round "${roundName}" confirmed locally.`);
     }
   };
 
@@ -2595,8 +2610,8 @@ export default function App() {
                               <p className="text-slate-300">Date: {formatDateDisplay(r.date)} &bull; Venue: {venueObj ? venueObj.name : 'Default Venue'}</p>
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
-                              <button onClick={() => handleConfirmPostseasonRound(ps.sport, r.roundName, r.date, r.venueId, 'Home')} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-semibold shadow">Confirm as Home Event</button>
-                              <button onClick={() => handleConfirmPostseasonRound(ps.sport, r.roundName, r.date, r.venueId, 'Away')} className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-semibold shadow">Confirm as Road Event</button>
+                              <button onClick={() => handleConfirmPostseasonRound(ps.sport, r.roundName, r.date, r.venueId, 'Home', ps.id, r.id)} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-semibold shadow">Confirm as Home Event</button>
+                              <button onClick={() => handleConfirmPostseasonRound(ps.sport, r.roundName, r.date, r.venueId, 'Away', ps.id, r.id)} className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-semibold shadow">Confirm as Road Event</button>
                               <button onClick={() => {
                                 if (window.confirm(`Are you sure you want to remove round "${r.roundName}"?`)) {
                                   const updatedRounds = ps.rounds.filter((_, i) => i !== idx);
@@ -2729,152 +2744,6 @@ export default function App() {
                 </div>
               );
             })}
-          </div>
-        </div>
-      )}
-
-      {/* Sport Config Modal */}
-      {showSportModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className={`${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-2xl max-w-xl w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto`}>
-            <h3 className="text-lg font-bold mb-3">{editingSportKey ? 'Edit Sport Configuration' : 'Add New Sport & Budget Defaults'}</h3>
-            <form onSubmit={handleSaveSport} className="space-y-4">
-              <div>
-                <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Sport Name</label>
-                <input type="text" required disabled={editingSportKey} value={sportFormData.name} onChange={(e) => setSportFormData({...sportFormData, name: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="e.g. Field Hockey" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Head Coach</label>
-                  <select value={sportFormData.headCoach || ''} onChange={(e) => setSportFormData({...sportFormData, headCoach: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
-                    <option value="">Select Coach</option>
-                    {staffMembers.filter(st => st.role === 'coach').map(st => <option key={st.id} value={st.name}>{st.name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Primary Venue</label>
-                  <select value={sportFormData.defaultVenueId} onChange={(e) => setSportFormData({...sportFormData, defaultVenueId: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
-                    {venues.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Tier</label>
-                  <select value={sportFormData.tier || 'Tier 2'} onChange={(e) => setSportFormData({...sportFormData, tier: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
-                    <option value="Tier 1 (Revenue)">Tier 1 (Revenue)</option>
-                    <option value="Tier 2">Tier 2</option>
-                    <option value="Tier 3">Tier 3</option>
-                  </select>
-                </div>
-                <div>
-                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Travel Size</label>
-                  <input type="number" value={sportFormData.rosterSize} onChange={(e) => setSportFormData({...sportFormData, rosterSize: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Warmup (Mins)</label>
-                  <input type="number" value={sportFormData.warmupMinutes} onChange={(e) => setSportFormData({...sportFormData, warmupMinutes: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                </div>
-                <div>
-                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Duration (Hrs)</label>
-                  <input type="number" step="0.5" value={sportFormData.defaultDuration} onChange={(e) => setSportFormData({...sportFormData, defaultDuration: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                </div>
-                <div>
-                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Student Staff Size</label>
-                  <input type="number" value={sportFormData.studentStaffCount} onChange={(e) => setSportFormData({...sportFormData, studentStaffCount: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Arrival Buffer (Hrs)</label>
-                  <input type="number" step="0.5" value={sportFormData.arrivalBufferHours} onChange={(e) => setSportFormData({...sportFormData, arrivalBufferHours: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                </div>
-                <div>
-                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Departure Buffer (Hrs)</label>
-                  <input type="number" step="0.5" value={sportFormData.departureBufferHours} onChange={(e) => setSportFormData({...sportFormData, departureBufferHours: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Officials Cost ($)</label>
-                  <input type="number" value={sportFormData.officialsCost} onChange={(e) => setSportFormData({...sportFormData, officialsCost: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                </div>
-                <div>
-                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Default Transportation</label>
-                  <select value={sportFormData.defaultTransportMode || 'Charter Bus'} onChange={(e) => setSportFormData({...sportFormData, defaultTransportMode: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
-                    {transportModes.map(tm => <option key={tm.id} value={tm.modeName}>{tm.modeName}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              {/* Staff Position Assignment Section */}
-              <div className={`p-3 ${darkMode ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-100 border-slate-200'} border rounded-xl space-y-3`}>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-indigo-400 uppercase">Assigned Staff Positions & Pay</span>
-                  <button type="button" onClick={() => {
-                    const current = sportFormData.assignedStaffRoles || [];
-                    const available = staffRoles[0] ? staffRoles[0].id : '';
-                    setSportFormData({ ...sportFormData, assignedStaffRoles: [...current, { roleId: available, hours: 4, hourlyBuffer: 1 }] });
-                  }} className="px-2.5 py-1 bg-indigo-600 text-white rounded-lg text-xs font-semibold">+ Add Staff Position</button>
-                </div>
-
-                <div className="space-y-2">
-                  {(sportFormData.assignedStaffRoles || []).map((item, idx) => {
-                    const roleObj = staffRoles.find(sr => sr.id === item.roleId);
-                    const singleCost = roleObj ? (roleObj.rateType === 'flat' ? roleObj.rateValue : roleObj.rateValue * (Number(item.hours || 4) + Number(item.hourlyBuffer || 0))) : 0;
-                    return (
-                      <div key={idx} className={`p-2.5 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-300'} border rounded-xl flex items-center gap-2 text-xs`}>
-                        <select value={item.roleId} onChange={(e) => {
-                          const updated = [...sportFormData.assignedStaffRoles];
-                          updated[idx].roleId = e.target.value;
-                          setSportFormData({ ...sportFormData, assignedStaffRoles: updated });
-                        }} className={`flex-1 ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-lg px-2 py-1 text-xs`}>
-                          {staffRoles.map(sr => <option key={sr.id} value={sr.id}>{sr.roleName} ({sr.rateType === 'flat' ? `$${sr.rateValue} flat` : `$${sr.rateValue}/hr`})</option>)}
-                        </select>
-                        {roleObj?.rateType === 'hourly' && (
-                          <>
-                            <div className="w-16">
-                              <span className="text-[10px] text-slate-400 block">Hours</span>
-                              <input type="number" step="0.5" value={item.hours} onChange={(e) => {
-                                const updated = [...sportFormData.assignedStaffRoles];
-                                updated[idx].hours = Number(e.target.value);
-                                setSportFormData({ ...sportFormData, assignedStaffRoles: updated });
-                              }} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-lg px-2 py-1 text-xs`} />
-                            </div>
-                            <div className="w-20">
-                              <span className="text-[10px] text-slate-400 block">Buffer Hrs</span>
-                              <input type="number" step="0.5" value={item.hourlyBuffer || 0} onChange={(e) => {
-                                const updated = [...sportFormData.assignedStaffRoles];
-                                updated[idx].hourlyBuffer = Number(e.target.value);
-                                setSportFormData({ ...sportFormData, assignedStaffRoles: updated });
-                              }} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-lg px-2 py-1 text-xs`} />
-                            </div>
-                          </>
-                        )}
-                        <span className="font-bold text-emerald-400 w-16 text-right">${singleCost}</span>
-                        <button type="button" onClick={() => {
-                          const updated = sportFormData.assignedStaffRoles.filter((_, i) => i !== idx);
-                          setSportFormData({ ...sportFormData, assignedStaffRoles: updated });
-                        }} className="text-rose-400 hover:text-rose-300 px-1 font-bold">×</button>
-                      </div>
-                    );
-                  })}
-                  {(!sportFormData.assignedStaffRoles || sportFormData.assignedStaffRoles.length === 0) && (
-                    <p className="text-xs text-slate-500 italic text-center py-2">No specific staff roles assigned. Click "+ Add Staff Position" above.</p>
-                  )}
-                </div>
-                <div className="text-right text-xs font-semibold text-slate-300 pt-1">
-                  Calculated Total Staffing Cost: <span className="text-emerald-400 font-bold">${calculateStaffCostForConfig(sportFormData.assignedStaffRoles)}</span>
-                </div>
-              </div>
-
-              <div className="flex justify-end space-x-3 pt-3">
-                <button type="button" onClick={() => setShowSportModal(false)} className={`px-4 py-2 text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600 font-semibold'}`}>Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold">Save Sport Configuration</button>
-              </div>
-            </form>
           </div>
         </div>
       )}
