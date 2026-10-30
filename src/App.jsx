@@ -214,6 +214,16 @@ export default function App() {
     rateValue: 3.50
   });
 
+  // Admin Review Modal & Filter States
+  const [reviewingSchedule, setReviewingSchedule] = useState(null);
+  const [filterSport, setFilterSport] = useState('All');
+  const [filterStatus, setFilterStatus] = useState('All');
+  const [filterType, setFilterType] = useState('All');
+  const [filterVenue, setFilterVenue] = useState('All');
+  const [filterConference, setFilterConference] = useState('All');
+  const [filterStartDate, setFilterStartDate] = useState('');
+  const [filterEndDate, setFilterEndDate] = useState('');
+
   const [budgetSubTab, setBudgetSubTab] = useState('summary');
   const [selectedSportDetail, setSelectedSportDetail] = useState(null);
 
@@ -1028,11 +1038,42 @@ export default function App() {
   }, [schedules, studentWorkerConfig, sportConfigs]);
 
   const displayedSchedules = useMemo(() => {
+    let list = schedules;
     if (role === 'coach') {
-      return schedules.filter(s => s.sport === currentUserSport);
+      list = list.filter(s => s.sport === currentUserSport);
     }
-    return schedules;
-  }, [schedules, role, currentUserSport]);
+
+    if (filterSport !== 'All') {
+      list = list.filter(s => s.sport === filterSport);
+    }
+    if (filterStatus !== 'All') {
+      list = list.filter(s => s.status === filterStatus);
+    }
+    if (filterType !== 'All') {
+      list = list.filter(s => s.locationType === filterType);
+    }
+    if (filterVenue !== 'All') {
+      list = list.filter(s => s.venueId === filterVenue);
+    }
+    if (filterConference !== 'All') {
+      const oppObj = opponents.find(o => o.name === s.opponent);
+      const isConf = oppObj ? oppObj.isConference : true;
+      if (filterConference === 'Conference') list = list.filter(s => isConf);
+      if (filterConference === 'Non-Conference') list = list.filter(s => !isConf);
+    }
+    if (filterStartDate) {
+      list = list.filter(s => s.date >= filterStartDate);
+    }
+    if (filterEndDate) {
+      list = list.filter(s => s.date <= filterEndDate);
+    }
+
+    return list;
+  }, [schedules, role, currentUserSport, filterSport, filterStatus, filterType, filterVenue, filterConference, filterStartDate, filterEndDate, opponents]);
+
+  const pendingSchedulesCount = useMemo(() => {
+    return schedules.filter(s => s.status === 'Pending').length;
+  }, [schedules]);
 
   const activeConflictsList = useMemo(() => {
     const list = [];
@@ -1209,6 +1250,61 @@ export default function App() {
                 <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold">Save Venue</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Review & Diff Modal for Admin */}
+      {reviewingSchedule && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className={`${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-4`}>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <h3 className="text-base font-bold text-indigo-400">Review Schedule Submission & Change Audit</h3>
+              <button onClick={() => setReviewingSchedule(null)} className="text-slate-400 hover:text-white"><X className="w-5 h-5"/></button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="grid grid-cols-2 gap-3 p-3 bg-slate-950/50 rounded-xl">
+                <div><span className="text-slate-400">Sport:</span> <strong className="text-white">{reviewingSchedule.sport}</strong></div>
+                <div><span className="text-slate-400">Coach:</span> <strong className="text-white">{reviewingSchedule.coachName}</strong></div>
+                <div><span className="text-slate-400">Opponent:</span> <strong className="text-white">{reviewingSchedule.opponent}</strong></div>
+                <div><span className="text-slate-400">Type:</span> <strong className="text-white">{reviewingSchedule.locationType}</strong></div>
+                <div><span className="text-slate-400">Venue:</span> <strong className="text-white">{reviewingSchedule.venueName}</strong></div>
+                <div><span className="text-slate-400">Date/Time:</span> <strong className="text-white">{formatDateDisplay(reviewingSchedule.date)} @ {formatTimeDisplay(reviewingSchedule.time)}</strong></div>
+              </div>
+
+              {reviewingSchedule.changeReason && (
+                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-1">
+                  <strong className="text-amber-400 block font-semibold">Reason for Schedule Change:</strong>
+                  <p className="text-slate-200">{reviewingSchedule.changeReason}</p>
+                </div>
+              )}
+
+              {reviewingSchedule.originalApprovedSnapshot && (
+                <div className="space-y-2">
+                  <h4 className="font-bold text-slate-300 uppercase tracking-wide text-[10px]">Change Diff (Comparison with Previous Approval)</h4>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="p-2.5 bg-rose-500/10 border border-rose-500/20 rounded-xl space-y-1">
+                      <span className="text-[10px] font-bold text-rose-400 uppercase">Previously Approved</span>
+                      <p className="text-slate-300">Date: {formatDateDisplay(reviewingSchedule.originalApprovedSnapshot.date)}</p>
+                      <p className="text-slate-300">Time: {formatTimeDisplay(reviewingSchedule.originalApprovedSnapshot.time)}</p>
+                      <p className="text-slate-300">Venue: {reviewingSchedule.originalApprovedSnapshot.venueName}</p>
+                    </div>
+                    <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl space-y-1">
+                      <span className="text-[10px] font-bold text-emerald-400 uppercase">New Request</span>
+                      <p className={`font-semibold ${reviewingSchedule.date !== reviewingSchedule.originalApprovedSnapshot.date ? 'text-emerald-400' : 'text-slate-300'}`}>Date: {formatDateDisplay(reviewingSchedule.date)}</p>
+                      <p className={`font-semibold ${reviewingSchedule.time !== reviewingSchedule.originalApprovedSnapshot.time ? 'text-emerald-400' : 'text-slate-300'}`}>Time: {formatTimeDisplay(reviewingSchedule.time)}</p>
+                      <p className={`font-semibold ${reviewingSchedule.venueId !== reviewingSchedule.originalApprovedSnapshot.venueId ? 'text-emerald-400' : 'text-slate-300'}`}>Venue: {reviewingSchedule.venueName}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end space-x-3 pt-3 border-t border-slate-800">
+              <button onClick={() => { updateStatus(reviewingSchedule.id, 'Rejected'); setReviewingSchedule(null); }} className="px-4 py-2 bg-rose-600/20 text-rose-400 rounded-xl text-xs font-semibold">Reject</button>
+              <button onClick={() => { updateStatus(reviewingSchedule.id, 'Approved'); setReviewingSchedule(null); }} className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold shadow">Approve Submission</button>
+            </div>
           </div>
         </div>
       )}
@@ -1416,7 +1512,65 @@ export default function App() {
         </aside>
 
         {/* Content Area */}
-        <main className="flex-1 p-6 overflow-y-auto">
+        <main className="flex-1 p-6 overflow-y-auto space-y-6">
+          
+          {/* Global Filter Bar (Available on Dashboard, Calendar, Matrix) */}
+          {(activeTab === 'dashboard' || activeTab === 'calendar' || activeTab === 'matrix') && (
+            <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'} border rounded-2xl p-4 shadow-sm flex flex-wrap items-center gap-3 text-xs`}>
+              <div className="flex items-center gap-1.5 font-semibold text-indigo-400">
+                <Filter className="w-4 h-4"/> Filters:
+              </div>
+              <select value={filterSport} onChange={(e) => setFilterSport(e.target.value)} className={`${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-2.5 py-1.5 text-xs`}>
+                <option value="All">All Sports</option>
+                {Object.keys(sportConfigs).map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+
+              <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className={`${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-2.5 py-1.5 text-xs`}>
+                <option value="All">All Statuses</option>
+                <option value="Approved">Approved</option>
+                <option value="Pending">Pending</option>
+                <option value="Conflict Warning">Conflict Warning</option>
+                <option value="Tentative">Tentative</option>
+              </select>
+
+              <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className={`${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-2.5 py-1.5 text-xs`}>
+                <option value="All">Home / Away / Neutral</option>
+                <option value="Home">Home</option>
+                <option value="Away">Away</option>
+                <option value="Neutral">Neutral Site</option>
+                <option value="Home Tournament">Home Tournament</option>
+                <option value="Road Tournament">Road Tournament</option>
+                <option value="Postseason">Postseason</option>
+              </select>
+
+              <select value={filterVenue} onChange={(e) => setFilterVenue(e.target.value)} className={`${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-2.5 py-1.5 text-xs`}>
+                <option value="All">All Venues</option>
+                {venues.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+              </select>
+
+              <select value={filterConference} onChange={(e) => setFilterConference(e.target.value)} className={`${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-2.5 py-1.5 text-xs`}>
+                <option value="All">Conf / Non-Conf</option>
+                <option value="Conference">Conference Only</option>
+                <option value="Non-Conference">Non-Conference Only</option>
+              </select>
+
+              <div className="flex items-center gap-1.5">
+                <span className="text-slate-400">From:</span>
+                <input type="date" value={filterStartDate} onChange={(e) => setFilterStartDate(e.target.value)} className={`${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-2 py-1.5 text-xs`} />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-slate-400">To:</span>
+                <input type="date" value={filterEndDate} onChange={(e) => setFilterEndDate(e.target.value)} className={`${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-2 py-1.5 text-xs`} />
+              </div>
+
+              {(filterSport !== 'All' || filterStatus !== 'All' || filterType !== 'All' || filterVenue !== 'All' || filterConference !== 'All' || filterStartDate || filterEndDate) && (
+                <button onClick={() => { setFilterSport('All'); setFilterStatus('All'); setFilterType('All'); setFilterVenue('All'); setFilterConference('All'); setFilterStartDate(''); setFilterEndDate(''); }} className="text-xs text-indigo-400 hover:underline font-semibold ml-auto">
+                  Clear Filters
+                </button>
+              )}
+            </div>
+          )}
+
           {activeTab === 'dashboard' && (
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -1425,8 +1579,8 @@ export default function App() {
                   <h3 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'} mt-1`}>{displayedSchedules.length}</h3>
                 </div>
                 <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'} border p-5 rounded-2xl`}>
-                  <p className="text-xs text-slate-400 font-medium">Venue Conflicts</p>
-                  <h3 className="text-2xl font-bold text-rose-500 mt-1">{activeConflictsList.length}</h3>
+                  <p className="text-xs text-slate-400 font-medium">Pending Submissions</p>
+                  <h3 className="text-2xl font-bold text-amber-500 mt-1">{pendingSchedulesCount}</h3>
                 </div>
                 <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'} border p-5 rounded-2xl`}>
                   <p className="text-xs text-slate-400 font-medium">Total Projected Budget</p>
@@ -1437,6 +1591,28 @@ export default function App() {
                   <h3 className="text-2xl font-bold text-indigo-400 mt-1">{Object.keys(sportConfigs).length}</h3>
                 </div>
               </div>
+
+              {/* Admin Review Queue Section */}
+              {role === 'admin' && pendingSchedulesCount > 0 && (
+                <div className={`${darkMode ? 'bg-amber-500/10 border-amber-500/30' : 'bg-amber-50 border-amber-200'} border rounded-2xl p-5`}>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-amber-500 mb-3">Admin Review Queue ({pendingSchedulesCount} Pending Submissions)</h4>
+                  <div className="space-y-2">
+                    {schedules.filter(s => s.status === 'Pending').map(s => (
+                      <div key={s.id} className={`flex items-center justify-between p-3 ${darkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-amber-200'} border rounded-xl text-xs`}>
+                        <div>
+                          <strong className="text-indigo-400">{s.sport} vs {s.opponent}</strong> ({s.locationType}) &bull; {formatDateDisplay(s.date)} @ {formatTimeDisplay(s.time)}
+                          {s.changeReason && <span className="block text-amber-400 text-[11px] mt-0.5">Change Reason: "{s.changeReason}"</span>}
+                        </div>
+                        <div className="flex space-x-2">
+                          <button onClick={() => setReviewingSchedule(s)} className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg font-semibold">Review Details</button>
+                          <button onClick={() => updateStatus(s.id, 'Approved')} className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg font-semibold">Approve</button>
+                          <button onClick={() => updateStatus(s.id, 'Rejected')} className="px-3 py-1.5 bg-rose-600 text-white rounded-lg font-semibold">Reject</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Quick Action Event Creation Bar */}
               <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'} border rounded-2xl p-5 shadow-sm`}>
@@ -1490,7 +1666,7 @@ export default function App() {
                       </tr>
                     </thead>
                     <tbody className={`divide-y ${darkMode ? 'divide-slate-800/60' : 'divide-slate-200'}`}>
-                      {displayedSchedules.slice(0, 8).map(s => (
+                      {displayedSchedules.slice(0, 10).map(s => (
                         <tr key={s.id} className={`${darkMode ? 'hover:bg-slate-900/50' : 'hover:bg-slate-50'}`}>
                           <td className={`py-3 font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>{s.sport}</td>
                           <td className="py-3 text-slate-400">{s.opponent}</td>
@@ -1512,10 +1688,7 @@ export default function App() {
                           </td>
                           <td className="py-3 text-right space-x-2">
                             {role === 'admin' && s.status === 'Pending' && (
-                              <>
-                                <button onClick={() => updateStatus(s.id, 'Approved')} className="p-1 bg-emerald-600/20 text-emerald-400 rounded" title="Approve"><Check className="w-3.5 h-3.5"/></button>
-                                <button onClick={() => updateStatus(s.id, 'Rejected')} className="p-1 bg-rose-600/20 text-rose-400 rounded" title="Reject"><X className="w-3.5 h-3.5"/></button>
-                              </>
+                              <button onClick={() => setReviewingSchedule(s)} className="p-1 bg-amber-600/20 text-amber-400 rounded" title="Review Submission"><FileText className="w-3.5 h-3.5"/></button>
                             )}
                             <button onClick={() => handleEditScheduleClick(s)} className="p-1 bg-indigo-600/20 text-indigo-400 rounded" title="Edit"><Edit3 className="w-3.5 h-3.5"/></button>
                             <button onClick={() => deleteSchedule(s.id)} className="p-1 bg-slate-800 text-slate-400 rounded" title="Delete"><Trash2 className="w-3.5 h-3.5"/></button>
