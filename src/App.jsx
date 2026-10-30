@@ -283,20 +283,15 @@ export default function App() {
       (snapshot) => {
         const loaded = [];
         snapshot.forEach(d => loaded.push({ id: d.id, ...d.data() }));
-        if (loaded.length > 0) setVenues(loaded);
-      },
-      (err) => {}
-    );
-
-    const unsubscribeSports = onSnapshot(sportsRef, 
-      (snapshot) => {
-        const loadedObj = {};
-        snapshot.forEach(d => {
-          const dat = d.data();
-          if (dat.name) loadedObj[dat.name] = dat;
-        });
-        if (Object.keys(loadedObj).length > 0) {
-          setSportConfigs(loadedObj);
+        if (loaded.length > 0) {
+          setVenues(loaded);
+          localStorage.setItem('app_venues', JSON.stringify(loaded));
+        } else {
+          // If remote collection is empty or deleted, preserve local state preference
+          const savedLocal = localStorage.getItem('app_venues');
+          if (savedLocal) {
+            setVenues(JSON.parse(savedLocal));
+          }
         }
       },
       (err) => {}
@@ -496,13 +491,19 @@ export default function App() {
   };
 
   const handleDeleteVenue = async (id) => {
+    // 1. Calculate updated venues list
     const updatedVenues = venues.filter(v => v.id !== id);
+    
+    // 2. Immediately persist to state & localStorage
     setVenues(updatedVenues);
     localStorage.setItem('app_venues', JSON.stringify(updatedVenues));
 
+    // 3. Attempt Firestore delete (or fallback gracefully)
     try {
       await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'venues', id));
-    } catch (e) {}
+    } catch (e) {
+      // Deletion remains saved in localStorage even if Firestore fails/offline
+    }
 
     showNotice('Venue deleted');
   };
