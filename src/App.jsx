@@ -38,16 +38,16 @@ const INITIAL_VENUES = [
 ];
 
 const INITIAL_SPORT_CONFIGS = {
-  'Football': { name: 'Football', defaultVenueId: 'v1', defaultDuration: 3.5, warmupMinutes: 90, arrivalBufferHours: 3, departureBufferHours: 1, teardownMinutes: 60, tier: 'Tier 1 (Revenue)', officialsCost: 2400, staffCost: 1100, rosterSize: 75, studentStaffCount: 12 },
-  'Men\'s Basketball': { name: "Men's Basketball", defaultVenueId: 'v2', defaultDuration: 2.5, warmupMinutes: 60, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 45, tier: 'Tier 1 (Revenue)', officialsCost: 1200, staffCost: 600, rosterSize: 15, studentStaffCount: 6 },
-  'Women\'s Basketball': { name: "Women's Basketball", defaultVenueId: 'v2', defaultDuration: 2.5, warmupMinutes: 60, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 45, tier: 'Tier 1 (Revenue)', officialsCost: 1200, staffCost: 600, rosterSize: 15, studentStaffCount: 6 },
-  'Men\'s Soccer': { name: "Men's Soccer", defaultVenueId: 'v3', defaultDuration: 2.0, warmupMinutes: 45, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 30, tier: 'Tier 2', officialsCost: 600, staffCost: 350, rosterSize: 24, studentStaffCount: 4 },
-  'Women\'s Soccer': { name: "Women's Soccer", defaultVenueId: 'v3', defaultDuration: 2.0, warmupMinutes: 45, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 30, tier: 'Tier 2', officialsCost: 600, staffCost: 350, rosterSize: 24, studentStaffCount: 4 },
-  'Volleyball': { name: 'Volleyball', defaultVenueId: 'v2', defaultDuration: 2.0, warmupMinutes: 45, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 30, tier: 'Tier 2', officialsCost: 500, staffCost: 300, rosterSize: 16, studentStaffCount: 4 },
-  'Baseball': { name: 'Baseball', defaultVenueId: 'v5', defaultDuration: 3.0, warmupMinutes: 60, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 45, tier: 'Tier 2', officialsCost: 800, staffCost: 400, rosterSize: 30, studentStaffCount: 5 },
-  'Softball': { name: 'Softball', defaultVenueId: 'v5', defaultDuration: 2.5, warmupMinutes: 45, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 30, tier: 'Tier 2', officialsCost: 700, staffCost: 350, rosterSize: 22, studentStaffCount: 4 },
-  'Lacrosse': { name: 'Lacrosse', defaultVenueId: 'v1', defaultDuration: 2.5, warmupMinutes: 45, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 30, tier: 'Tier 3', officialsCost: 600, staffCost: 300, rosterSize: 30, studentStaffCount: 4 },
-  'Swimming': { name: 'Swimming', defaultVenueId: 'v4', defaultDuration: 2.5, warmupMinutes: 30, arrivalBufferHours: 1.5, departureBufferHours: 1, teardownMinutes: 30, tier: 'Tier 3', officialsCost: 400, staffCost: 250, rosterSize: 25, studentStaffCount: 4 }
+  'Football': { name: 'Football', defaultVenueId: 'v1', defaultDuration: 3.5, warmupMinutes: 90, arrivalBufferHours: 3, departureBufferHours: 1, teardownMinutes: 60, tier: 'Tier 1 (Revenue)', officialsCost: 2400, staffCost: 1100, rosterSize: 75, studentStaffCount: 12, defaultTransportMode: 'Charter Bus' },
+  'Men\'s Basketball': { name: "Men's Basketball", defaultVenueId: 'v2', defaultDuration: 2.5, warmupMinutes: 60, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 45, tier: 'Tier 1 (Revenue)', officialsCost: 1200, staffCost: 600, rosterSize: 15, studentStaffCount: 6, defaultTransportMode: 'Charter Bus' },
+  'Women\'s Basketball': { name: "Women's Basketball", defaultVenueId: 'v2', defaultDuration: 2.5, warmupMinutes: 60, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 45, tier: 'Tier 1 (Revenue)', officialsCost: 1200, staffCost: 600, rosterSize: 15, studentStaffCount: 6, defaultTransportMode: 'Charter Bus' },
+  'Men\'s Soccer': { name: "Men's Soccer", defaultVenueId: 'v3', defaultDuration: 2.0, warmupMinutes: 45, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 30, tier: 'Tier 2', officialsCost: 600, staffCost: 350, rosterSize: 24, studentStaffCount: 4, defaultTransportMode: 'Van Fleet' },
+  'Women\'s Soccer': { name: "Women's Soccer", defaultVenueId: 'v3', defaultDuration: 2.0, warmupMinutes: 45, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 30, tier: 'Tier 2', officialsCost: 600, staffCost: 350, rosterSize: 24, studentStaffCount: 4, defaultTransportMode: 'Van Fleet' },
+  'Volleyball': { name: 'Volleyball', defaultVenueId: 'v2', defaultDuration: 2.0, warmupMinutes: 45, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 30, tier: 'Tier 2', officialsCost: 500, staffCost: 300, rosterSize: 16, studentStaffCount: 4, defaultTransportMode: 'Van Fleet' },
+  'Baseball': { name: 'Baseball', defaultVenueId: 'v5', defaultDuration: 3.0, warmupMinutes: 60, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 45, tier: 'Tier 2', officialsCost: 800, staffCost: 400, rosterSize: 30, studentStaffCount: 5, defaultTransportMode: 'Charter Bus' },
+  'Softball': { name: 'Softball', defaultVenueId: 'v5', defaultDuration: 2.5, warmupMinutes: 45, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 30, tier: 'Tier 2', officialsCost: 700, staffCost: 350, rosterSize: 22, studentStaffCount: 4, defaultTransportMode: 'Charter Bus' },
+  'Lacrosse': { name: 'Lacrosse', defaultVenueId: 'v1', defaultDuration: 2.5, warmupMinutes: 45, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 30, tier: 'Tier 3', officialsCost: 600, staffCost: 300, rosterSize: 30, studentStaffCount: 4, defaultTransportMode: 'Charter Bus' },
+  'Swimming': { name: 'Swimming', defaultVenueId: 'v4', defaultDuration: 2.5, warmupMinutes: 30, arrivalBufferHours: 1.5, departureBufferHours: 1, teardownMinutes: 30, tier: 'Tier 3', officialsCost: 400, staffCost: 250, rosterSize: 25, studentStaffCount: 4, defaultTransportMode: 'Van Fleet' }
 };
 
 const INITIAL_OPPONENTS = [
@@ -176,7 +176,8 @@ export default function App() {
     officialsCost: 600,
     staffCost: 350,
     rosterSize: 25,
-    studentStaffCount: 4
+    studentStaffCount: 4,
+    defaultTransportMode: 'Charter Bus'
   });
 
   const [showStaffMemberModal, setShowStaffMemberModal] = useState(false);
@@ -1894,48 +1895,132 @@ export default function App() {
           )}
 
           {activeTab === 'sports' && (
-            <div className="space-y-6 max-w-5xl mx-auto">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className={`text-base font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Sports Management & Default Parameters</h3>
-                  <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'} mt-0.5`}>Manage sports, primary home venues, sport tiers, default warmup/travel buffers, and staffing budgets.</p>
-                </div>
-                <button onClick={() => { setEditingSportKey(null); setSportFormData({ name: '', headCoach: 'Coach Marcus Vance', defaultVenueId: venues[0]?.id || 'v1', defaultDuration: 2.5, warmupMinutes: 45, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 30, tier: 'Tier 2', officialsCost: 600, staffCost: 350, rosterSize: 25, studentStaffCount: 4 }); setShowSportModal(true); }} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow">
-                  <Plus className="w-4 h-4"/> Add Sport
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {Object.entries(sportConfigs).map(([key, config]) => {
-                  const venueObj = venues.find(v => v.id === config.defaultVenueId);
-                  return (
-                    <div key={key} className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border rounded-2xl p-5 flex flex-col justify-between`}>
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{config.name || key}</h4>
-                          <span className="text-[10px] bg-indigo-600/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 px-2 py-0.5 rounded-full font-semibold">{config.tier || 'Tier 2'}</span>
-                        </div>
-                        <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1 flex items-center gap-1`}><Users className="w-3.5 h-3.5"/> Head Coach: <span className="font-semibold">{config.headCoach || 'Unassigned'}</span></p>
-                        <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-3 flex items-center gap-1`}><MapPin className="w-3.5 h-3.5"/> Primary Venue: {venueObj ? venueObj.name : 'Unassigned'}</p>
-                        <div className={`grid grid-cols-2 gap-2 text-xs ${darkMode ? 'text-slate-400 bg-slate-900/40' : 'text-slate-800 bg-slate-100 border border-slate-200'} p-3 rounded-xl`}>
-                          <div>Warmup Time: <span className={`${darkMode ? 'text-white' : 'text-slate-900'} font-semibold`}>{config.warmupMinutes || 45} mins</span></div>
-                          <div>Arrival Buffer: <span className={`${darkMode ? 'text-white' : 'text-slate-900'} font-semibold`}>{config.arrivalBufferHours || 2} hrs</span></div>
-                          <div>Roster Size: <span className={`${darkMode ? 'text-white' : 'text-slate-900'} font-semibold`}>{config.rosterSize || 25}</span></div>
-                          <div>Student Staff: <span className={`${darkMode ? 'text-white' : 'text-slate-900'} font-semibold`}>{config.studentStaffCount || 4}</span></div>
-                          <div>Officials Cost: <span className="text-emerald-600 dark:text-emerald-400 font-semibold">${config.officialsCost || 600}</span></div>
-                          <div>Staff Cost: <span className="text-emerald-600 dark:text-emerald-400 font-semibold">${config.staffCost || 350}</span></div>
-                        </div>
-                      </div>
-                      <div className={`pt-4 mt-4 border-t ${darkMode ? 'border-slate-900' : 'border-slate-200'} flex justify-end space-x-2`}>
-                        <button onClick={() => { setEditingSportKey(key); setSportFormData(config); setShowSportModal(true); }} className={`px-3 py-1.5 ${darkMode ? 'bg-slate-900 text-slate-300' : 'bg-slate-200 text-slate-800 font-semibold'} rounded-xl hover:opacity-90 text-xs`}>Edit</button>
-                        <button onClick={() => handleDeleteSport(key)} className={`px-3 py-1.5 ${darkMode ? 'bg-slate-900 text-rose-400' : 'bg-rose-50 text-rose-700 font-semibold'} rounded-xl hover:opacity-90 text-xs`}>Remove</button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+        <div className="space-y-6 max-w-5xl mx-auto">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className={`text-base font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Sports Management & Default Parameters</h3>
+              <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'} mt-0.5`}>Configure sport head coaches, primary venues, tiers, buffers, staffing costs, and default transportation.</p>
             </div>
-          )}
+            <button onClick={() => { setEditingSportKey(null); setSportFormData({ name: '', headCoach: 'Coach Marcus Vance', defaultVenueId: venues[0]?.id || 'v1', defaultDuration: 2.5, warmupMinutes: 45, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 30, tier: 'Tier 2', officialsCost: 600, staffCost: 350, rosterSize: 25, studentStaffCount: 4, defaultTransportMode: 'Charter Bus' }); setShowSportModal(true); }} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow">
+              <Plus className="w-4 h-4"/> Add Sport
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {Object.entries(sportConfigs).map(([key, config]) => {
+              const venueObj = venues.find(v => v.id === config.defaultVenueId);
+              return (
+                <div key={key} className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border rounded-2xl p-5 flex flex-col justify-between`}>
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{config.name || key}</h4>
+                      <span className="text-[10px] bg-indigo-600/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 px-2 py-0.5 rounded-full font-semibold">{config.tier || 'Tier 2'}</span>
+                    </div>
+                    <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1 flex items-center gap-1`}><Users className="w-3.5 h-3.5"/> Head Coach: <span className="font-semibold">{config.headCoach || 'Unassigned'}</span></p>
+                    <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-3 flex items-center gap-1`}><MapPin className="w-3.5 h-3.5"/> Primary Venue: {venueObj ? venueObj.name : 'Unassigned'}</p>
+                    <div className={`grid grid-cols-2 gap-2 text-xs ${darkMode ? 'text-slate-400 bg-slate-900/40' : 'text-slate-800 bg-slate-100 border border-slate-200'} p-3 rounded-xl`}>
+                      <div>Duration: <span className={`${darkMode ? 'text-white' : 'text-slate-900'} font-semibold`}>{config.defaultDuration || 2.5} hrs</span></div>
+                      <div>Warmup Time: <span className={`${darkMode ? 'text-white' : 'text-slate-900'} font-semibold`}>{config.warmupMinutes || 45} mins</span></div>
+                      <div>Arrival Buffer: <span className={`${darkMode ? 'text-white' : 'text-slate-900'} font-semibold`}>{config.arrivalBufferHours || 2} hrs</span></div>
+                      <div>Departure Buffer: <span className={`${darkMode ? 'text-white' : 'text-slate-900'} font-semibold`}>{config.departureBufferHours || 1} hrs</span></div>
+                      <div>Travel Size: <span className={`${darkMode ? 'text-white' : 'text-slate-900'} font-semibold`}>{config.rosterSize || 25}</span></div>
+                      <div>Student Staff: <span className={`${darkMode ? 'text-white' : 'text-slate-900'} font-semibold`}>{config.studentStaffCount || 4}</span></div>
+                      <div>Officials Cost: <span className="text-emerald-600 dark:text-emerald-400 font-semibold">${config.officialsCost || 600}</span></div>
+                      <div>Default Transport: <span className="text-indigo-400 font-semibold">{config.defaultTransportMode || 'Charter Bus'}</span></div>
+                    </div>
+                  </div>
+                  <div className={`pt-4 mt-4 border-t ${darkMode ? 'border-slate-900' : 'border-slate-200'} flex justify-end space-x-2`}>
+                    <button onClick={() => { setEditingSportKey(key); setSportFormData(config); setShowSportModal(true); }} className={`px-3 py-1.5 ${darkMode ? 'bg-slate-900 text-slate-300' : 'bg-slate-200 text-slate-800 font-semibold'} rounded-xl hover:opacity-90 text-xs`}>Edit</button>
+                    <button onClick={() => handleDeleteSport(key)} className={`px-3 py-1.5 ${darkMode ? 'bg-slate-900 text-rose-400' : 'bg-rose-50 text-rose-700 font-semibold'} rounded-xl hover:opacity-90 text-xs`}>Remove</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Sport Config Modal */}
+      {showSportModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className={`${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-2xl max-w-lg w-full p-6 shadow-2xl`}>
+            <h3 className="text-lg font-bold mb-3">{editingSportKey ? 'Edit Sport Configuration' : 'Add New Sport & Budget Defaults'}</h3>
+            <form onSubmit={handleSaveSport} className="space-y-4">
+              <div>
+                <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Sport</label>
+                <input type="text" required disabled={editingSportKey} value={sportFormData.name} onChange={(e) => setSportFormData({...sportFormData, name: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="e.g. Field Hockey" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Head Coach</label>
+                  <select value={sportFormData.headCoach || ''} onChange={(e) => setSportFormData({...sportFormData, headCoach: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
+                    <option value="">Select Coach</option>
+                    {staffMembers.filter(st => st.role === 'coach').map(st => <option key={st.id} value={st.name}>{st.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Primary Venue</label>
+                  <select value={sportFormData.defaultVenueId} onChange={(e) => setSportFormData({...sportFormData, defaultVenueId: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
+                    {venues.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Tier</label>
+                  <select value={sportFormData.tier || 'Tier 2'} onChange={(e) => setSportFormData({...sportFormData, tier: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
+                    <option value="Tier 1 (Revenue)">Tier 1 (Revenue)</option>
+                    <option value="Tier 2">Tier 2</option>
+                    <option value="Tier 3">Tier 3</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Travel Size</label>
+                  <input type="number" value={sportFormData.rosterSize} onChange={(e) => setSportFormData({...sportFormData, rosterSize: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Warmup (Mins)</label>
+                  <input type="number" value={sportFormData.warmupMinutes} onChange={(e) => setSportFormData({...sportFormData, warmupMinutes: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                </div>
+                <div>
+                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Duration (Hrs)</label>
+                  <input type="number" step="0.5" value={sportFormData.defaultDuration} onChange={(e) => setSportFormData({...sportFormData, defaultDuration: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                </div>
+                <div>
+                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Student Staff Size</label>
+                  <input type="number" value={sportFormData.studentStaffCount} onChange={(e) => setSportFormData({...sportFormData, studentStaffCount: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Arrival Buffer (Hrs)</label>
+                  <input type="number" step="0.5" value={sportFormData.arrivalBufferHours} onChange={(e) => setSportFormData({...sportFormData, arrivalBufferHours: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                </div>
+                <div>
+                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Departure Buffer (Hrs)</label>
+                  <input type="number" step="0.5" value={sportFormData.departureBufferHours} onChange={(e) => setSportFormData({...sportFormData, departureBufferHours: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                </div>
+                <div>
+                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Officials Cost ($)</label>
+                  <input type="number" value={sportFormData.officialsCost} onChange={(e) => setSportFormData({...sportFormData, officialsCost: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                </div>
+              </div>
+              <div>
+                <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Default Transportation Mode</label>
+                <select value={sportFormData.defaultTransportMode || 'Charter Bus'} onChange={(e) => setSportFormData({...sportFormData, defaultTransportMode: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
+                  {transportModes.map(tm => <option key={tm.id} value={tm.modeName}>{tm.modeName}</option>)}
+                </select>
+              </div>
+              <div className="flex justify-end space-x-3 pt-3">
+                <button type="button" onClick={() => setShowSportModal(false)} className={`px-4 py-2 text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600 font-semibold'}`}>Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold">Save Sport Configuration</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
           {activeTab === 'staff' && (
             <div className="space-y-6 max-w-5xl mx-auto">
