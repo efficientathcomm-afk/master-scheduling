@@ -38,16 +38,16 @@ const INITIAL_VENUES = [
 ];
 
 const INITIAL_SPORT_CONFIGS = {
-  'Football': { name: 'Football', defaultVenueId: 'v1', defaultDuration: 3.5, warmupMinutes: 90, arrivalBufferHours: 3, departureBufferHours: 1, teardownMinutes: 60, tier: 'Tier 1 (Revenue)', officialsCost: 2400, staffCost: 1100, rosterSize: 75, studentStaffCount: 12, defaultTransportMode: 'Charter Bus' },
-  'Men\'s Basketball': { name: "Men's Basketball", defaultVenueId: 'v2', defaultDuration: 2.5, warmupMinutes: 60, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 45, tier: 'Tier 1 (Revenue)', officialsCost: 1200, staffCost: 600, rosterSize: 15, studentStaffCount: 6, defaultTransportMode: 'Charter Bus' },
-  'Women\'s Basketball': { name: "Women's Basketball", defaultVenueId: 'v2', defaultDuration: 2.5, warmupMinutes: 60, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 45, tier: 'Tier 1 (Revenue)', officialsCost: 1200, staffCost: 600, rosterSize: 15, studentStaffCount: 6, defaultTransportMode: 'Charter Bus' },
-  'Men\'s Soccer': { name: "Men's Soccer", defaultVenueId: 'v3', defaultDuration: 2.0, warmupMinutes: 45, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 30, tier: 'Tier 2', officialsCost: 600, staffCost: 350, rosterSize: 24, studentStaffCount: 4, defaultTransportMode: 'Van Fleet' },
-  'Women\'s Soccer': { name: "Women's Soccer", defaultVenueId: 'v3', defaultDuration: 2.0, warmupMinutes: 45, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 30, tier: 'Tier 2', officialsCost: 600, staffCost: 350, rosterSize: 24, studentStaffCount: 4, defaultTransportMode: 'Van Fleet' },
-  'Volleyball': { name: 'Volleyball', defaultVenueId: 'v2', defaultDuration: 2.0, warmupMinutes: 45, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 30, tier: 'Tier 2', officialsCost: 500, staffCost: 300, rosterSize: 16, studentStaffCount: 4, defaultTransportMode: 'Van Fleet' },
-  'Baseball': { name: 'Baseball', defaultVenueId: 'v5', defaultDuration: 3.0, warmupMinutes: 60, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 45, tier: 'Tier 2', officialsCost: 800, staffCost: 400, rosterSize: 30, studentStaffCount: 5, defaultTransportMode: 'Charter Bus' },
-  'Softball': { name: 'Softball', defaultVenueId: 'v5', defaultDuration: 2.5, warmupMinutes: 45, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 30, tier: 'Tier 2', officialsCost: 700, staffCost: 350, rosterSize: 22, studentStaffCount: 4, defaultTransportMode: 'Charter Bus' },
-  'Lacrosse': { name: 'Lacrosse', defaultVenueId: 'v1', defaultDuration: 2.5, warmupMinutes: 45, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 30, tier: 'Tier 3', officialsCost: 600, staffCost: 300, rosterSize: 30, studentStaffCount: 4, defaultTransportMode: 'Charter Bus' },
-  'Swimming': { name: 'Swimming', defaultVenueId: 'v4', defaultDuration: 2.5, warmupMinutes: 30, arrivalBufferHours: 1.5, departureBufferHours: 1, teardownMinutes: 30, tier: 'Tier 3', officialsCost: 400, staffCost: 250, rosterSize: 25, studentStaffCount: 4, defaultTransportMode: 'Van Fleet' }
+  'Football': { name: 'Football', defaultVenueId: 'v1', defaultDuration: 3.5, warmupMinutes: 90, arrivalBufferHours: 3, departureBufferHours: 1, teardownMinutes: 60, tier: 'Tier 1 (Revenue)', officialsCost: 2400, staffCost: 1100, rosterSize: 75, studentStaffCount: 12, defaultTransportMode: 'Charter Bus', assignedStaffRoles: [{ roleId: 'sr-1', hours: 5, hourlyBuffer: 1 }] },
+  'Men\'s Basketball': { name: "Men's Basketball", defaultVenueId: 'v2', defaultDuration: 2.5, warmupMinutes: 60, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 45, tier: 'Tier 1 (Revenue)', officialsCost: 1200, staffCost: 600, rosterSize: 15, studentStaffCount: 6, defaultTransportMode: 'Charter Bus', assignedStaffRoles: [{ roleId: 'sr-1', hours: 3, hourlyBuffer: 1 }] },
+  'Women\'s Basketball': { name: "Women's Basketball", defaultVenueId: 'v2', defaultDuration: 2.5, warmupMinutes: 60, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 45, tier: 'Tier 1 (Revenue)', officialsCost: 1200, staffCost: 600, rosterSize: 15, studentStaffCount: 6, defaultTransportMode: 'Charter Bus', assignedStaffRoles: [{ roleId: 'sr-1', hours: 3, hourlyBuffer: 1 }] },
+  'Men\'s Soccer': { name: "Men's Soccer", defaultVenueId: 'v3', defaultDuration: 2.0, warmupMinutes: 45, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 30, tier: 'Tier 2', officialsCost: 600, staffCost: 350, rosterSize: 24, studentStaffCount: 4, defaultTransportMode: 'Van Fleet', assignedStaffRoles: [] },
+  'Women\'s Soccer': { name: "Women's Soccer", defaultVenueId: 'v3', defaultDuration: 2.0, warmupMinutes: 45, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 30, tier: 'Tier 2', officialsCost: 600, staffCost: 350, rosterSize: 24, studentStaffCount: 4, defaultTransportMode: 'Van Fleet', assignedStaffRoles: [] },
+  'Volleyball': { name: 'Volleyball', defaultVenueId: 'v2', defaultDuration: 2.0, warmupMinutes: 45, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 30, tier: 'Tier 2', officialsCost: 500, staffCost: 300, rosterSize: 16, studentStaffCount: 4, defaultTransportMode: 'Van Fleet', assignedStaffRoles: [] },
+  'Baseball': { name: 'Baseball', defaultVenueId: 'v5', defaultDuration: 3.0, warmupMinutes: 60, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 45, tier: 'Tier 2', officialsCost: 800, staffCost: 400, rosterSize: 30, studentStaffCount: 5, defaultTransportMode: 'Charter Bus', assignedStaffRoles: [] },
+  'Softball': { name: 'Softball', defaultVenueId: 'v5', defaultDuration: 2.5, warmupMinutes: 45, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 30, tier: 'Tier 2', officialsCost: 700, staffCost: 350, rosterSize: 22, studentStaffCount: 4, defaultTransportMode: 'Charter Bus', assignedStaffRoles: [] },
+  'Lacrosse': { name: 'Lacrosse', defaultVenueId: 'v1', defaultDuration: 2.5, warmupMinutes: 45, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 30, tier: 'Tier 3', officialsCost: 600, staffCost: 300, rosterSize: 30, studentStaffCount: 4, defaultTransportMode: 'Charter Bus', assignedStaffRoles: [] },
+  'Swimming': { name: 'Swimming', defaultVenueId: 'v4', defaultDuration: 2.5, warmupMinutes: 30, arrivalBufferHours: 1.5, departureBufferHours: 1, teardownMinutes: 30, tier: 'Tier 3', officialsCost: 400, staffCost: 250, rosterSize: 25, studentStaffCount: 4, defaultTransportMode: 'Van Fleet', assignedStaffRoles: [] }
 };
 
 const INITIAL_OPPONENTS = [
@@ -177,7 +177,8 @@ export default function App() {
     staffCost: 350,
     rosterSize: 25,
     studentStaffCount: 4,
-    defaultTransportMode: 'Charter Bus'
+    defaultTransportMode: 'Charter Bus',
+    assignedStaffRoles: [] // Array of { roleId, hours, hourlyBuffer }
   });
 
   const [showStaffMemberModal, setShowStaffMemberModal] = useState(false);
@@ -628,24 +629,44 @@ export default function App() {
 
     try {
       await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'venues', id));
-    } catch (e) {}
-
-    showNotice('Venue deleted');
+      showNotice('Venue deleted successfully.');
+    } catch (e) {
+      showNotice('Venue removed locally.');
+    }
   };
 
-  // Save/Delete Sport Configs
+  const calculateStaffCostForConfig = (assignedRoles) => {
+    if (!assignedRoles || !Array.isArray(assignedRoles)) return 0;
+    let total = 0;
+    assignedRoles.forEach(item => {
+      const roleObj = staffRoles.find(sr => sr.id === item.roleId);
+      if (roleObj) {
+        if (roleObj.rateType === 'flat') {
+          total += Number(roleObj.rateValue || 0);
+        } else {
+          const totalHours = Number(item.hours || roleObj.defaultHours || 4) + Number(item.hourlyBuffer || 0);
+          total += Number(roleObj.rateValue || 0) * totalHours;
+        }
+      }
+    });
+    return total;
+  };
+
   const handleSaveSport = async (e) => {
     e.preventDefault();
     if (!sportFormData.name) return;
     const sportName = sportFormData.name;
-    const updatedConfigs = { ...sportConfigs, [sportName]: sportFormData };
+    const calculatedStaffCost = calculateStaffCostForConfig(sportFormData.assignedStaffRoles);
+    const finalPayload = { ...sportFormData, staffCost: calculatedStaffCost };
+    
+    const updatedConfigs = { ...sportConfigs, [sportName]: finalPayload };
 
     setSportConfigs(updatedConfigs);
     localStorage.setItem('app_sport_configs', JSON.stringify(updatedConfigs));
 
     try {
       const sportDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'sports', sportName.replace(/[^a-zA-Z0-9]/g, '_'));
-      await setDoc(sportDocRef, sportFormData);
+      await setDoc(sportDocRef, finalPayload);
     } catch (err) {}
 
     setShowSportModal(false);
@@ -1313,7 +1334,7 @@ export default function App() {
       {/* Sport Config Modal */}
       {showSportModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className={`${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-2xl max-w-lg w-full p-6 shadow-2xl`}>
+          <div className={`${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-2xl max-w-xl w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto`}>
             <h3 className="text-lg font-bold mb-3">{editingSportKey ? 'Edit Sport Configuration' : 'Add New Sport & Budget Defaults'}</h3>
             <form onSubmit={handleSaveSport} className="space-y-4">
               <div>
@@ -1329,7 +1350,7 @@ export default function App() {
                   </select>
                 </div>
                 <div>
-                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Primary Home Venue</label>
+                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Primary Venue</label>
                   <select value={sportFormData.defaultVenueId} onChange={(e) => setSportFormData({...sportFormData, defaultVenueId: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
                     {venues.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
                   </select>
@@ -1337,7 +1358,7 @@ export default function App() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Sport Tier</label>
+                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Tier</label>
                   <select value={sportFormData.tier || 'Tier 2'} onChange={(e) => setSportFormData({...sportFormData, tier: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
                     <option value="Tier 1 (Revenue)">Tier 1 (Revenue)</option>
                     <option value="Tier 2">Tier 2</option>
@@ -1345,7 +1366,7 @@ export default function App() {
                   </select>
                 </div>
                 <div>
-                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Roster Size (Travel)</label>
+                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Travel Size</label>
                   <input type="number" value={sportFormData.rosterSize} onChange={(e) => setSportFormData({...sportFormData, rosterSize: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
                 </div>
               </div>
@@ -1355,28 +1376,98 @@ export default function App() {
                   <input type="number" value={sportFormData.warmupMinutes} onChange={(e) => setSportFormData({...sportFormData, warmupMinutes: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
                 </div>
                 <div>
+                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Duration (Hrs)</label>
+                  <input type="number" step="0.5" value={sportFormData.defaultDuration} onChange={(e) => setSportFormData({...sportFormData, defaultDuration: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                </div>
+                <div>
+                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Student Staff Size</label>
+                  <input type="number" value={sportFormData.studentStaffCount} onChange={(e) => setSportFormData({...sportFormData, studentStaffCount: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
                   <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Arrival Buffer (Hrs)</label>
                   <input type="number" step="0.5" value={sportFormData.arrivalBufferHours} onChange={(e) => setSportFormData({...sportFormData, arrivalBufferHours: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
                 </div>
                 <div>
-                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Departure (Hrs)</label>
+                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Departure Buffer (Hrs)</label>
                   <input type="number" step="0.5" value={sportFormData.departureBufferHours} onChange={(e) => setSportFormData({...sportFormData, departureBufferHours: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Student Staff Count</label>
-                  <input type="number" value={sportFormData.studentStaffCount} onChange={(e) => setSportFormData({...sportFormData, studentStaffCount: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                </div>
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Officials Cost ($)</label>
                   <input type="number" value={sportFormData.officialsCost} onChange={(e) => setSportFormData({...sportFormData, officialsCost: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
                 </div>
                 <div>
-                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Staff Cost ($)</label>
-                  <input type="number" value={sportFormData.staffCost} onChange={(e) => setSportFormData({...sportFormData, staffCost: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Default Transportation</label>
+                  <select value={sportFormData.defaultTransportMode || 'Charter Bus'} onChange={(e) => setSportFormData({...sportFormData, defaultTransportMode: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
+                    {transportModes.map(tm => <option key={tm.id} value={tm.modeName}>{tm.modeName}</option>)}
+                  </select>
                 </div>
               </div>
+
+              {/* Staff Position Assignment Section */}
+              <div className={`p-3 ${darkMode ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-100 border-slate-200'} border rounded-xl space-y-3`}>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-indigo-400 uppercase">Assigned Staff Positions & Pay</span>
+                  <button type="button" onClick={() => {
+                    const current = sportFormData.assignedStaffRoles || [];
+                    const available = staffRoles[0] ? staffRoles[0].id : '';
+                    setSportFormData({ ...sportFormData, assignedStaffRoles: [...current, { roleId: available, hours: 4, hourlyBuffer: 1 }] });
+                  }} className="px-2.5 py-1 bg-indigo-600 text-white rounded-lg text-xs font-semibold">+ Add Staff Position</button>
+                </div>
+
+                <div className="space-y-2">
+                  {(sportFormData.assignedStaffRoles || []).map((item, idx) => {
+                    const roleObj = staffRoles.find(sr => sr.id === item.roleId);
+                    const singleCost = roleObj ? (roleObj.rateType === 'flat' ? roleObj.rateValue : roleObj.rateValue * (Number(item.hours || 4) + Number(item.hourlyBuffer || 0))) : 0;
+                    return (
+                      <div key={idx} className={`p-2.5 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-300'} border rounded-xl flex items-center gap-2 text-xs`}>
+                        <select value={item.roleId} onChange={(e) => {
+                          const updated = [...sportFormData.assignedStaffRoles];
+                          updated[idx].roleId = e.target.value;
+                          setSportFormData({ ...sportFormData, assignedStaffRoles: updated });
+                        }} className={`flex-1 ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-lg px-2 py-1 text-xs`}>
+                          {staffRoles.map(sr => <option key={sr.id} value={sr.id}>{sr.roleName} ({sr.rateType === 'flat' ? `$${sr.rateValue} flat` : `$${sr.rateValue}/hr`})</option>)}
+                        </select>
+                        {roleObj?.rateType === 'hourly' && (
+                          <>
+                            <div className="w-16">
+                              <span className="text-[10px] text-slate-400 block">Hours</span>
+                              <input type="number" step="0.5" value={item.hours} onChange={(e) => {
+                                const updated = [...sportFormData.assignedStaffRoles];
+                                updated[idx].hours = Number(e.target.value);
+                                setSportFormData({ ...sportFormData, assignedStaffRoles: updated });
+                              }} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-lg px-2 py-1 text-xs`} />
+                            </div>
+                            <div className="w-20">
+                              <span className="text-[10px] text-slate-400 block">Buffer Hrs</span>
+                              <input type="number" step="0.5" value={item.hourlyBuffer || 0} onChange={(e) => {
+                                const updated = [...sportFormData.assignedStaffRoles];
+                                updated[idx].hourlyBuffer = Number(e.target.value);
+                                setSportFormData({ ...sportFormData, assignedStaffRoles: updated });
+                              }} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-lg px-2 py-1 text-xs`} />
+                            </div>
+                          </>
+                        )}
+                        <span className="font-bold text-emerald-400 w-16 text-right">${singleCost}</span>
+                        <button type="button" onClick={() => {
+                          const updated = sportFormData.assignedStaffRoles.filter((_, i) => i !== idx);
+                          setSportFormData({ ...sportFormData, assignedStaffRoles: updated });
+                        }} className="text-rose-400 hover:text-rose-300 px-1 font-bold">×</button>
+                      </div>
+                    );
+                  })}
+                  {(!sportFormData.assignedStaffRoles || sportFormData.assignedStaffRoles.length === 0) && (
+                    <p className="text-xs text-slate-500 italic text-center py-2">No specific staff roles assigned. Click "+ Add Staff Position" above.</p>
+                  )}
+                </div>
+                <div className="text-right text-xs font-semibold text-slate-300 pt-1">
+                  Calculated Total Staffing Cost: <span className="text-emerald-400 font-bold">${calculateStaffCostForConfig(sportFormData.assignedStaffRoles)}</span>
+                </div>
+              </div>
+
               <div className="flex justify-end space-x-3 pt-3">
                 <button type="button" onClick={() => setShowSportModal(false)} className={`px-4 py-2 text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600 font-semibold'}`}>Cancel</button>
                 <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold">Save Sport Configuration</button>
@@ -1901,7 +1992,7 @@ export default function App() {
               <h3 className={`text-base font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Sports Management & Default Parameters</h3>
               <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'} mt-0.5`}>Configure sport head coaches, primary venues, tiers, buffers, staffing costs, and default transportation.</p>
             </div>
-            <button onClick={() => { setEditingSportKey(null); setSportFormData({ name: '', headCoach: 'Coach Marcus Vance', defaultVenueId: venues[0]?.id || 'v1', defaultDuration: 2.5, warmupMinutes: 45, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 30, tier: 'Tier 2', officialsCost: 600, staffCost: 350, rosterSize: 25, studentStaffCount: 4, defaultTransportMode: 'Charter Bus' }); setShowSportModal(true); }} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow">
+            <button onClick={() => { setEditingSportKey(null); setSportFormData({ name: '', headCoach: 'Coach Marcus Vance', defaultVenueId: venues[0]?.id || 'v1', defaultDuration: 2.5, warmupMinutes: 45, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 30, tier: 'Tier 2', officialsCost: 600, staffCost: 350, rosterSize: 25, studentStaffCount: 4, defaultTransportMode: 'Charter Bus', assignedStaffRoles: [] }); setShowSportModal(true); }} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow">
               <Plus className="w-4 h-4"/> Add Sport
             </button>
           </div>
@@ -1909,6 +2000,7 @@ export default function App() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {Object.entries(sportConfigs).map(([key, config]) => {
               const venueObj = venues.find(v => v.id === config.defaultVenueId);
+              const computedStaffCost = calculateStaffCostForConfig(config.assignedStaffRoles);
               return (
                 <div key={key} className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border rounded-2xl p-5 flex flex-col justify-between`}>
                   <div>
@@ -1926,7 +2018,7 @@ export default function App() {
                       <div>Travel Size: <span className={`${darkMode ? 'text-white' : 'text-slate-900'} font-semibold`}>{config.rosterSize || 25}</span></div>
                       <div>Student Staff: <span className={`${darkMode ? 'text-white' : 'text-slate-900'} font-semibold`}>{config.studentStaffCount || 4}</span></div>
                       <div>Officials Cost: <span className="text-emerald-600 dark:text-emerald-400 font-semibold">${config.officialsCost || 600}</span></div>
-                      <div>Default Transport: <span className="text-indigo-400 font-semibold">{config.defaultTransportMode || 'Charter Bus'}</span></div>
+                      <div>Staffing Cost: <span className="text-purple-400 font-semibold">${computedStaffCost}</span></div>
                     </div>
                   </div>
                   <div className={`pt-4 mt-4 border-t ${darkMode ? 'border-slate-900' : 'border-slate-200'} flex justify-end space-x-2`}>
@@ -1943,11 +2035,11 @@ export default function App() {
       {/* Sport Config Modal */}
       {showSportModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className={`${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-2xl max-w-lg w-full p-6 shadow-2xl`}>
+          <div className={`${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-2xl max-w-xl w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto`}>
             <h3 className="text-lg font-bold mb-3">{editingSportKey ? 'Edit Sport Configuration' : 'Add New Sport & Budget Defaults'}</h3>
             <form onSubmit={handleSaveSport} className="space-y-4">
               <div>
-                <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Sport</label>
+                <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Sport Name</label>
                 <input type="text" required disabled={editingSportKey} value={sportFormData.name} onChange={(e) => setSportFormData({...sportFormData, name: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="e.g. Field Hockey" />
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -1993,7 +2085,7 @@ export default function App() {
                   <input type="number" value={sportFormData.studentStaffCount} onChange={(e) => setSportFormData({...sportFormData, studentStaffCount: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Arrival Buffer (Hrs)</label>
                   <input type="number" step="0.5" value={sportFormData.arrivalBufferHours} onChange={(e) => setSportFormData({...sportFormData, arrivalBufferHours: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
@@ -2002,17 +2094,81 @@ export default function App() {
                   <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Departure Buffer (Hrs)</label>
                   <input type="number" step="0.5" value={sportFormData.departureBufferHours} onChange={(e) => setSportFormData({...sportFormData, departureBufferHours: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
                 </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Officials Cost ($)</label>
                   <input type="number" value={sportFormData.officialsCost} onChange={(e) => setSportFormData({...sportFormData, officialsCost: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
                 </div>
+                <div>
+                  <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Default Transportation</label>
+                  <select value={sportFormData.defaultTransportMode || 'Charter Bus'} onChange={(e) => setSportFormData({...sportFormData, defaultTransportMode: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
+                    {transportModes.map(tm => <option key={tm.id} value={tm.modeName}>{tm.modeName}</option>)}
+                  </select>
+                </div>
               </div>
-              <div>
-                <label className={`block text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-700'} mb-1`}>Default Transportation Mode</label>
-                <select value={sportFormData.defaultTransportMode || 'Charter Bus'} onChange={(e) => setSportFormData({...sportFormData, defaultTransportMode: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
-                  {transportModes.map(tm => <option key={tm.id} value={tm.modeName}>{tm.modeName}</option>)}
-                </select>
+
+              {/* Staff Position Assignment Section */}
+              <div className={`p-3 ${darkMode ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-100 border-slate-200'} border rounded-xl space-y-3`}>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-indigo-400 uppercase">Assigned Staff Positions & Pay</span>
+                  <button type="button" onClick={() => {
+                    const current = sportFormData.assignedStaffRoles || [];
+                    const available = staffRoles[0] ? staffRoles[0].id : '';
+                    setSportFormData({ ...sportFormData, assignedStaffRoles: [...current, { roleId: available, hours: 4, hourlyBuffer: 1 }] });
+                  }} className="px-2.5 py-1 bg-indigo-600 text-white rounded-lg text-xs font-semibold">+ Add Staff Position</button>
+                </div>
+
+                <div className="space-y-2">
+                  {(sportFormData.assignedStaffRoles || []).map((item, idx) => {
+                    const roleObj = staffRoles.find(sr => sr.id === item.roleId);
+                    const singleCost = roleObj ? (roleObj.rateType === 'flat' ? roleObj.rateValue : roleObj.rateValue * (Number(item.hours || 4) + Number(item.hourlyBuffer || 0))) : 0;
+                    return (
+                      <div key={idx} className={`p-2.5 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-300'} border rounded-xl flex items-center gap-2 text-xs`}>
+                        <select value={item.roleId} onChange={(e) => {
+                          const updated = [...sportFormData.assignedStaffRoles];
+                          updated[idx].roleId = e.target.value;
+                          setSportFormData({ ...sportFormData, assignedStaffRoles: updated });
+                        }} className={`flex-1 ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-lg px-2 py-1 text-xs`}>
+                          {staffRoles.map(sr => <option key={sr.id} value={sr.id}>{sr.roleName} ({sr.rateType === 'flat' ? `$${sr.rateValue} flat` : `$${sr.rateValue}/hr`})</option>)}
+                        </select>
+                        {roleObj?.rateType === 'hourly' && (
+                          <>
+                            <div className="w-16">
+                              <span className="text-[10px] text-slate-400 block">Hours</span>
+                              <input type="number" step="0.5" value={item.hours} onChange={(e) => {
+                                const updated = [...sportFormData.assignedStaffRoles];
+                                updated[idx].hours = Number(e.target.value);
+                                setSportFormData({ ...sportFormData, assignedStaffRoles: updated });
+                              }} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-lg px-2 py-1 text-xs`} />
+                            </div>
+                            <div className="w-20">
+                              <span className="text-[10px] text-slate-400 block">Buffer Hrs</span>
+                              <input type="number" step="0.5" value={item.hourlyBuffer || 0} onChange={(e) => {
+                                const updated = [...sportFormData.assignedStaffRoles];
+                                updated[idx].hourlyBuffer = Number(e.target.value);
+                                setSportFormData({ ...sportFormData, assignedStaffRoles: updated });
+                              }} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-lg px-2 py-1 text-xs`} />
+                            </div>
+                          </>
+                        )}
+                        <span className="font-bold text-emerald-400 w-16 text-right">${singleCost}</span>
+                        <button type="button" onClick={() => {
+                          const updated = sportFormData.assignedStaffRoles.filter((_, i) => i !== idx);
+                          setSportFormData({ ...sportFormData, assignedStaffRoles: updated });
+                        }} className="text-rose-400 hover:text-rose-300 px-1 font-bold">×</button>
+                      </div>
+                    );
+                  })}
+                  {(!sportFormData.assignedStaffRoles || sportFormData.assignedStaffRoles.length === 0) && (
+                    <p className="text-xs text-slate-500 italic text-center py-2">No specific staff roles assigned. Click "+ Add Staff Position" above.</p>
+                  )}
+                </div>
+                <div className="text-right text-xs font-semibold text-slate-300 pt-1">
+                  Calculated Total Staffing Cost: <span className="text-emerald-400 font-bold">${calculateStaffCostForConfig(sportFormData.assignedStaffRoles)}</span>
+                </div>
               </div>
+
               <div className="flex justify-end space-x-3 pt-3">
                 <button type="button" onClick={() => setShowSportModal(false)} className={`px-4 py-2 text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600 font-semibold'}`}>Cancel</button>
                 <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold">Save Sport Configuration</button>
