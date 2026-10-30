@@ -156,6 +156,27 @@ export default function App() {
   const [changeReason, setChangeReason] = useState('');
   const [originalApprovedSnapshot, setOriginalApprovedSnapshot] = useState(null);
 
+  // Postseason Management State
+  const [postseasons, setPostseasons] = useState(() => {
+    const saved = localStorage.getItem('app_postseasons');
+    return saved ? JSON.parse(saved) : [
+      {
+        id: 'ps-1',
+        sport: 'Football',
+        rounds: [
+          { id: 'r1', roundName: 'Conference Semi-Final', date: '2026-11-20', venueId: 'v1' },
+          { id: 'r2', roundName: 'Conference Championship', date: '2026-11-27', venueId: 'v1' }
+        ]
+      }
+    ];
+  });
+  const [showPostseasonModal, setShowPostseasonModal] = useState(false);
+  const [editingPostseasonId, setEditingPostseasonId] = useState(null);
+  const [postseasonFormData, setPostseasonFormData] = useState({
+    sport: 'Football',
+    rounds: [{ id: 'r-' + Date.now(), roundName: 'Round 1', date: '', venueId: 'v1' }]
+  });
+
   // Modal display states
   const [showVenueModal, setShowVenueModal] = useState(false);
   const [editingVenue, setEditingVenue] = useState(null);
@@ -576,7 +597,6 @@ export default function App() {
     const config = sportConfigs[defaultSport] || {};
     const isHome = locType === 'Home' || locType === 'Home Tournament';
     const isTournament = locType === 'Home Tournament' || locType === 'Road Tournament';
-    const isRoadTourney = locType === 'Road Tournament';
     
     setEditingScheduleId(null);
     setFormData({
@@ -621,6 +641,80 @@ export default function App() {
       notes: ''
     });
     setActiveTab('submit');
+  };
+
+  const handleSavePostseason = async (e) => {
+    e.preventDefault();
+    if (!postseasonFormData.sport) return;
+    const psId = editingPostseasonId || ('ps-' + Date.now());
+    const payload = { id: psId, ...postseasonFormData };
+    let updated;
+
+    if (editingPostseasonId) {
+      updated = postseasons.map(p => p.id === editingPostseasonId ? payload : p);
+      showNotice('Postseason updated.');
+    } else {
+      updated = [...postseasons, payload];
+      showNotice('Postseason schedule added.');
+    }
+
+    setPostseasons(updated);
+    localStorage.setItem('app_postseasons', JSON.stringify(updated));
+
+    try {
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'postseasons', psId), payload);
+    } catch (err) {}
+
+    setShowPostseasonModal(false);
+    setEditingPostseasonId(null);
+    setPostseasonFormData({ sport: 'Football', rounds: [{ id: 'r-' + Date.now(), roundName: 'Round 1', date: '', venueId: 'v1' }] });
+  };
+
+  const handleDeletePostseason = async (id) => {
+    const updated = postseasons.filter(p => p.id !== id);
+    setPostseasons(updated);
+    localStorage.setItem('app_postseasons', JSON.stringify(updated));
+    try {
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'postseasons', id));
+    } catch (e) {}
+    showNotice('Postseason schedule removed.');
+  };
+
+  const handleConfirmPostseasonRound = async (sport, roundName, date, venueId, eventType) => {
+    const venueObj = venues.find(v => v.id === venueId);
+    const venueName = eventType === 'Home' ? (venueObj ? venueObj.name : 'Home Venue') : 'Away Venue';
+    const config = sportConfigs[sport] || {};
+
+    const newRecord = {
+      sport,
+      coachName: 'Postseason Coordinator',
+      opponent: 'TBA Opponent',
+      locationType: eventType,
+      venueId: eventType === 'Home' ? venueId : 'Away',
+      venueName,
+      date: date || new Date().toISOString().split('T')[0],
+      time: '14:00',
+      durationHours: config.defaultDuration || 2.5,
+      warmupMinutes: config.warmupMinutes || 45,
+      teardownMinutes: eventType === 'Home' ? 0 : 30,
+      travelCost: eventType === 'Home' ? 0 : 800,
+      mealCost: eventType === 'Home' ? 0 : 450,
+      hotelCost: 0,
+      hostingCost: eventType === 'Home' ? (config.officialsCost || 600) : 0,
+      overnightTravel: false,
+      travelPartySize: config.rosterSize || 30,
+      travelMode: config.defaultTransportMode || 'Charter Bus',
+      status: 'Pending',
+      notes: `Postseason Confirmation: ${roundName}`
+    };
+
+    try {
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'events'), newRecord);
+      showNotice(`Postseason round "${roundName}" confirmed as ${eventType} event and sent to Pending Submissions.`);
+    } catch (err) {
+      setSchedules(prev => [...prev, { id: 'ps-evt-' + Date.now(), ...newRecord }]);
+      showNotice(`Postseason round "${roundName}" confirmed as ${eventType} event locally.`);
+    }
   };
 
   const handleEditScheduleClick = (ev) => {
@@ -1694,6 +1788,11 @@ export default function App() {
             <span>Sports Management</span>
           </button>
 
+          <button onClick={() => setActiveTab('postseason')} className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all ${activeTab === 'postseason' ? (darkMode ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20' : 'bg-indigo-50 text-indigo-700 font-semibold border border-indigo-200') : (darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-700 hover:text-slate-900')}`}>
+            <Shield className="w-4 h-4" />
+            <span>Postseason Management</span>
+          </button>
+
           <button onClick={() => setActiveTab('staff')} className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all ${activeTab === 'staff' ? (darkMode ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20' : 'bg-indigo-50 text-indigo-700 font-semibold border border-indigo-200') : (darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-700 hover:text-slate-900')}`}>
             <Briefcase className="w-4 h-4" />
             <span>Staff Management</span>
@@ -1846,11 +1945,6 @@ export default function App() {
                   <button onClick={() => openAddEventWithType('Road Tournament')} className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow">
                     + Add Road Tournament
                   </button>
-                  {role === 'admin' && (
-                    <button onClick={() => openAddEventWithType('Postseason')} className="px-3.5 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-semibold shadow">
-                      + Add Postseason (Admin)
-                    </button>
-                  )}
                 </div>
               </div>
 
@@ -2416,6 +2510,15 @@ export default function App() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {venues.map(v => {
                   const venueEvents = schedules.filter(s => s.venueId === v.id && s.status !== 'Rejected');
+                  const venuePostseasonRounds = [];
+                  postseasons.forEach(ps => {
+                    ps.rounds.forEach(r => {
+                      if (r.venueId === v.id) {
+                        venuePostseasonRounds.push({ sport: ps.sport, ...r });
+                      }
+                    });
+                  });
+
                   return (
                     <div key={v.id} className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'} border rounded-2xl p-5`}>
                       <div className={`flex items-center justify-between mb-3 pb-2 border-b ${darkMode ? 'border-slate-900' : 'border-slate-100'}`}>
@@ -2423,8 +2526,19 @@ export default function App() {
                         <span className={`text-[10px] ${darkMode ? 'bg-slate-900 text-slate-400' : 'bg-slate-100 text-slate-600'} px-2 py-0.5 rounded`}>{v.type}</span>
                       </div>
                       <p className="text-xs text-slate-400 mb-3">Capacity: {v.capacity} seats</p>
+                      
                       <div className="space-y-2">
-                        {venueEvents.length === 0 ? (
+                        {venuePostseasonRounds.map((ps, idx) => (
+                          <div key={'ps-' + idx} className="p-2.5 bg-rose-500/15 border border-rose-500/30 rounded-xl text-xs space-y-1">
+                            <div className="flex justify-between font-bold text-rose-400">
+                              <span>POSTSEASON: {ps.sport} {ps.roundName}</span>
+                              <span>{formatDateDisplay(ps.date)}</span>
+                            </div>
+                            <p className="text-slate-300 text-[10px]">Placeholder &bull; Matchup TBA</p>
+                          </div>
+                        ))}
+
+                        {venueEvents.length === 0 && venuePostseasonRounds.length === 0 ? (
                           <p className="text-xs text-slate-500 italic py-2">No events scheduled at this venue.</p>
                         ) : (
                           venueEvents.map(e => (
@@ -2441,6 +2555,124 @@ export default function App() {
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'postseason' && (
+            <div className="space-y-6 max-w-5xl mx-auto">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className={`text-base font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Postseason Management</h3>
+                  <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'} mt-0.5`}>Create and manage postseason rounds, venue calendars, and convert rounds to Home or Road event submissions.</p>
+                </div>
+                <button onClick={() => { setEditingPostseasonId(null); setPostseasonFormData({ sport: 'Football', rounds: [{ id: 'r-' + Date.now(), roundName: 'Round 1', date: '', venueId: venues[0]?.id || 'v1' }] }); setShowPostseasonModal(true); }} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow">
+                  <Plus className="w-4 h-4"/> Add Postseason Schedule
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {postseasons.map(ps => (
+                  <div key={ps.id} className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border rounded-2xl p-6 space-y-4`}>
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                      <div>
+                        <h4 className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{ps.sport} Postseason Schedule</h4>
+                        <p className="text-xs text-slate-400">{ps.rounds.length} rounds configured</p>
+                      </div>
+                      <div className="space-x-2">
+                        <button onClick={() => { setEditingPostseasonId(ps.id); setPostseasonFormData(ps); setShowPostseasonModal(true); }} className={`px-3 py-1.5 ${darkMode ? 'bg-slate-900 text-slate-300' : 'bg-slate-200 text-slate-800 font-semibold'} rounded-xl text-xs`}>Edit</button>
+                        <button onClick={() => handleDeletePostseason(ps.id)} className="px-3 py-1.5 bg-rose-600/20 text-rose-400 rounded-xl text-xs">Remove</button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      {ps.rounds.map((r, idx) => {
+                        const venueObj = venues.find(v => v.id === r.venueId);
+                        return (
+                          <div key={r.id || idx} className={`p-4 ${darkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'} border rounded-xl flex flex-col md:flex-row items-center justify-between gap-3 text-xs`}>
+                            <div>
+                              <strong className="text-indigo-400 text-sm block mb-1">{r.roundName}</strong>
+                              <p className="text-slate-300">Date: {formatDateDisplay(r.date)} &bull; Venue: {venueObj ? venueObj.name : 'Default Venue'}</p>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <button onClick={() => handleConfirmPostseasonRound(ps.sport, r.roundName, r.date, r.venueId, 'Home')} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-semibold shadow">Confirm as Home Event</button>
+                              <button onClick={() => handleConfirmPostseasonRound(ps.sport, r.roundName, r.date, r.venueId, 'Away')} className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-semibold shadow">Confirm as Road Event</button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Postseason Modal */}
+          {showPostseasonModal && (
+            <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className={`${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-2xl max-w-xl w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto`}>
+                <h3 className="text-lg font-bold mb-3">{editingPostseasonId ? 'Edit Postseason Schedule' : 'Add Postseason Schedule'}</h3>
+                <form onSubmit={handleSavePostseason} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Sport</label>
+                    <select value={postseasonFormData.sport} onChange={(e) => setPostseasonFormData({...postseasonFormData, sport: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
+                      {Object.keys(sportConfigs).map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-semibold text-indigo-400 uppercase">Postseason Rounds</label>
+                      <button type="button" onClick={() => {
+                        const rounds = postseasonFormData.rounds || [];
+                        setPostseasonFormData({ ...postseasonFormData, rounds: [...rounds, { id: 'r-' + Date.now(), roundName: `Round ${rounds.length + 1}`, date: '', venueId: venues[0]?.id || 'v1' }] });
+                      }} className="px-2.5 py-1 bg-indigo-600 text-white rounded-lg text-xs font-semibold">+ Round</button>
+                    </div>
+
+                    {(postseasonFormData.rounds || []).map((r, idx) => (
+                      <div key={r.id || idx} className={`p-3 ${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300'} border rounded-xl grid grid-cols-1 md:grid-cols-3 gap-3 items-center text-xs`}>
+                        <div>
+                          <span className="text-[10px] text-slate-400 block mb-1">Round Name</span>
+                          <input type="text" required placeholder="e.g. Semi-Final" value={r.roundName} onChange={(e) => {
+                            const updated = [...postseasonFormData.rounds];
+                            updated[idx].roundName = e.target.value;
+                            setPostseasonFormData({ ...postseasonFormData, rounds: updated });
+                          }} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-lg px-2 py-1.5 text-xs`} />
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-400 block mb-1">Date</span>
+                          <input type="date" required value={r.date} onChange={(e) => {
+                            const updated = [...postseasonFormData.rounds];
+                            updated[idx].date = e.target.value;
+                            setPostseasonFormData({ ...postseasonFormData, rounds: updated });
+                          }} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-lg px-2 py-1.5 text-xs`} />
+                        </div>
+                        <div className="flex items-end gap-2">
+                          <div className="flex-1">
+                            <span className="text-[10px] text-slate-400 block mb-1">Venue</span>
+                            <select value={r.venueId} onChange={(e) => {
+                              const updated = [...postseasonFormData.rounds];
+                              updated[idx].venueId = e.target.value;
+                              setPostseasonFormData({ ...postseasonFormData, rounds: updated });
+                            }} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-lg px-2 py-1.5 text-xs`}>
+                              {venues.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+                            </select>
+                          </div>
+                          <button type="button" onClick={() => {
+                            const updated = postseasonFormData.rounds.filter((_, i) => i !== idx);
+                            setPostseasonFormData({ ...postseasonFormData, rounds: updated });
+                          }} className="text-rose-400 hover:text-rose-300 font-bold px-1 pb-1.5">×</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex justify-end space-x-3 pt-3">
+                    <button type="button" onClick={() => setShowPostseasonModal(false)} className="px-4 py-2 text-xs text-slate-400">Cancel</button>
+                    <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold">{editingPostseasonId ? 'Update Postseason' : 'Save Postseason'}</button>
+                  </div>
+                </form>
               </div>
             </div>
           )}
