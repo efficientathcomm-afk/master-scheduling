@@ -255,6 +255,19 @@ export default function App() {
     returnDate: '',
     returnTime: '',
     tournamentDetails: '',
+    tournamentGames: [], // Array of { id, date, time, matchup, isTbaTime, isTbaOpponent }
+    tournamentAdditionalCost: 0,
+    tournamentAdditionalCostReason: '',
+    roadTourneyHostedAtSchool: 'yes',
+    roadTourneyHostSchool: '',
+    roadTourneyLocation: '',
+    roadTourneyAdditionalCosts: {
+      transportation: { amount: 0, explanation: '' },
+      hotel: { amount: 0, explanation: '' },
+      entryFee: { amount: 0, explanation: '' },
+      meals: { amount: 0, explanation: '' },
+      other: { amount: 0, explanation: '' }
+    },
     neutralLocationName: '',
     notes: ''
   });
@@ -380,12 +393,18 @@ export default function App() {
         if (loaded.length > 0) {
           setTransportModes(loaded);
           localStorage.setItem('app_transport_modes', JSON.stringify(loaded));
-        } else {
-          INITIAL_TRANSPORT_MODES.forEach(async (tm) => {
-            try {
-              await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transportModes', tm.id), tm);
-            } catch (e) {}
-          });
+        }
+      },
+      (err) => {}
+    );
+
+    const unsubscribeStaffMembers = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'staffMembers'),
+      (snapshot) => {
+        const loaded = [];
+        snapshot.forEach(d => loaded.push({ id: d.id, ...d.data() }));
+        if (loaded.length > 0) {
+          setStaffMembers(loaded);
+          localStorage.setItem('app_staff_members', JSON.stringify(loaded));
         }
       },
       (err) => {}
@@ -398,6 +417,7 @@ export default function App() {
       unsubscribeSports();
       unsubscribeStaff();
       unsubscribeTransport();
+      unsubscribeStaffMembers();
     };
   }, [authReady]);
 
@@ -407,30 +427,73 @@ export default function App() {
   };
 
   const handleSportChange = (sportName) => {
-    const config = sportConfigs[sportName];
-    if (config) {
-      setFormData(prev => ({
-        ...prev,
-        sport: sportName,
-        venueId: config.defaultVenueId || prev.venueId,
-        durationHours: config.defaultDuration || 2.5,
-        warmupMinutes: config.warmupMinutes || 45,
-        teardownMinutes: config.teardownMinutes || 30,
-        travelPartySize: config.rosterSize || 30
-      }));
-    }
+    const config = sportConfigs[sportName] || {};
+    setFormData(prev => ({
+      ...prev,
+      sport: sportName,
+      venueId: config.defaultVenueId || 'v1',
+      travelPartySize: config.rosterSize || 30,
+      durationHours: config.defaultDuration || 2.5,
+      warmupMinutes: config.warmupMinutes || 45,
+      travelMode: config.defaultTransportMode || 'Charter Bus'
+    }));
   };
 
-  const calculateCosts = (oppName, locType, overnight, partySize, sportName, tMode, roomsCount, hotelRate, durationHrs) => {
+  const calculateCosts = (oppName, locType, overnight, partySize, sportName, tMode, roomsCount, hotelRate, durationHrs, isTournament, tGames, tAddCost, roadTourneyCosts) => {
     const oppObj = opponents.find(o => o.name === oppName);
     const config = sportConfigs[sportName] || sportConfigs['Football'] || { officialsCost: 600, staffCost: 300, studentStaffCount: 4 };
     const distance = oppObj ? oppObj.distance : 100;
     
     let travel = 0, meals = 0, hotel = 0, hosting = 0, studentWorkerCost = 0;
-    const isHome = locType === 'Home' || locType === 'Tournament';
+    const isHome = locType === 'Home' || locType === 'Home Tournament';
 
-    if (isHome) {
-      // Officials + Staff Roles + Student Workers
+    if (locType === 'Road Tournament') {
+      const addCosts = roadTourneyCosts || {};
+      const transAdd = Number(addCosts.transportation?.amount || 0);
+      const hotelAdd = Number(addCosts.hotel?.amount || 0);
+      const entryAdd = Number(addCosts.entryFee?.amount || 0);
+      const mealsAdd = Number(addCosts.meals?.amount || 0);
+      const otherAdd = Number(addCosts.other?.amount || 0);
+
+      const transportModeObj = transportModes.find(tm => tm.modeName === tMode);
+      const rateVal = transportModeObj ? transportModeObj.rateValue : 4.50;
+      const rateType = transportModeObj ? transportModeObj.rateType : 'mileage';
+
+      let baseTravel = 0;
+      if (rateType === 'mileage') {
+        baseTravel = (distance * 2) * rateVal;
+      } else if (rateType === 'hourly') {
+        const estHours = 4 + (distance / 50);
+        baseTravel = estHours * rateVal;
+      } else {
+        baseTravel = rateVal;
+      }
+
+      const baseMeals = partySize * 45 * 3;
+      const baseHotel = roomsCount * hotelRate * 2;
+
+      travel = baseTravel + transAdd;
+      hotel = baseHotel + hotelAdd;
+      meals = baseMeals + mealsAdd;
+      hosting = entryAdd + otherAdd;
+    } else if (isTournament) {
+      const gameCount = Math.max(1, (tGames || []).length);
+      let rolesHostingTotal = 0;
+      staffRoles.forEach(sr => {
+        if (sr.rateType === 'flat') {
+          rolesHostingTotal += Number(sr.rateValue || 0) * gameCount;
+        } else {
+          rolesHostingTotal += Number(sr.rateValue || 0) * Number(sr.defaultHours || 4) * gameCount;
+        }
+      });
+
+      const totalGameHours = (Number(durationHrs || 2.5) + (Number(studentWorkerConfig.prepAndTeardownMinutes || 90) / 60)) * gameCount;
+      const studentWorkersTotal = Number(config.studentStaffCount || 4) * Number(studentWorkerConfig.hourlyRate || 15) * totalGameHours;
+      const officialsTotal = Number(config.officialsCost || 600) * gameCount;
+
+      hosting = officialsTotal + rolesHostingTotal + studentWorkersTotal + Number(tAddCost || 0);
+      studentWorkerCost = studentWorkersTotal;
+    } else if (isHome) {
       let rolesHostingTotal = 0;
       staffRoles.forEach(sr => {
         if (sr.rateType === 'flat') {
@@ -467,6 +530,8 @@ export default function App() {
 
   const handleOpponentOrTripChange = (updates) => {
     const nextData = { ...formData, ...updates };
+    const isTournamentType = nextData.locationType === 'Home Tournament' || nextData.locationType === 'Road Tournament';
+    const isRoadTourney = nextData.locationType === 'Road Tournament';
     const costs = calculateCosts(
       nextData.opponent, 
       nextData.locationType, 
@@ -476,7 +541,11 @@ export default function App() {
       nextData.travelMode,
       nextData.hotelRoomsCount,
       nextData.customHotelCostPerNight,
-      nextData.durationHours
+      nextData.durationHours,
+      isTournamentType,
+      nextData.tournamentGames,
+      nextData.tournamentAdditionalCost,
+      nextData.roadTourneyAdditionalCosts
     );
     setFormData({
       ...nextData,
@@ -490,22 +559,30 @@ export default function App() {
 
   const handleLocationTypeChange = (locType) => {
     const isHome = locType === 'Home' || locType === 'Home Tournament';
+    const isTournament = locType === 'Home Tournament' || locType === 'Road Tournament';
+    const isRoadTourney = locType === 'Road Tournament';
     const config = sportConfigs[formData.sport] || sportConfigs['Football'] || {};
     const venueId = isHome ? (config.defaultVenueId || 'v1') : 'Away';
-    handleOpponentOrTripChange({ locationType: locType, venueId, teardownMinutes: isHome ? 0 : 30 });
+    handleOpponentOrTripChange({ 
+      locationType: locType, 
+      venueId, 
+      teardownMinutes: isHome ? 0 : 30,
+      tournamentGames: isTournament && formData.tournamentGames.length === 0 ? [{ id: 'tg-' + Date.now(), date: formData.date || '', time: formData.time || '14:00', matchup: '', isTbaTime: false, isTbaOpponent: false }] : formData.tournamentGames
+    });
   };
 
-  // Quick initiate event addition with preset location type
   const openAddEventWithType = (locType) => {
     const defaultSport = role === 'coach' ? currentUserSport : 'Football';
     const config = sportConfigs[defaultSport] || {};
     const isHome = locType === 'Home' || locType === 'Home Tournament';
+    const isTournament = locType === 'Home Tournament' || locType === 'Road Tournament';
+    const isRoadTourney = locType === 'Road Tournament';
     
     setEditingScheduleId(null);
     setFormData({
       sport: defaultSport,
       coachName: role === 'coach' ? `Coach (${defaultSport})` : 'Coach Marcus Vance',
-      opponent: opponents[0]?.name || '',
+      opponent: isTournament ? 'Tournament Field' : (opponents[0]?.name || ''),
       locationType: locType,
       venueId: isHome ? (config.defaultVenueId || 'v1') : 'Away',
       date: '',
@@ -527,6 +604,19 @@ export default function App() {
       returnDate: '',
       returnTime: '',
       tournamentDetails: '',
+      tournamentGames: isTournament ? [{ id: 'tg-' + Date.now(), date: '', time: '14:00', matchup: '', isTbaTime: false, isTbaOpponent: false }] : [],
+      tournamentAdditionalCost: 0,
+      tournamentAdditionalCostReason: '',
+      roadTourneyHostedAtSchool: 'yes',
+      roadTourneyHostSchool: '',
+      roadTourneyLocation: '',
+      roadTourneyAdditionalCosts: {
+        transportation: { amount: 0, explanation: '' },
+        hotel: { amount: 0, explanation: '' },
+        entryFee: { amount: 0, explanation: '' },
+        meals: { amount: 0, explanation: '' },
+        other: { amount: 0, explanation: '' }
+      },
       neutralLocationName: '',
       notes: ''
     });
@@ -559,9 +649,12 @@ export default function App() {
       customHotelCostPerNight: ev.customHotelCostPerNight || 160,
       departureDate: ev.departureDate || '',
       departureTime: ev.departureTime || '',
-      returnDate: ev.returnDate || '',
+      returnDate: '',
       returnTime: '',
       tournamentDetails: ev.tournamentDetails || '',
+      tournamentGames: ev.tournamentGames || [],
+      tournamentAdditionalCost: ev.tournamentAdditionalCost || 0,
+      tournamentAdditionalCostReason: ev.tournamentAdditionalCostReason || '',
       neutralLocationName: ev.neutralLocationName || '',
       notes: ev.notes || ''
     });
@@ -949,9 +1042,23 @@ export default function App() {
 
   const handleScheduleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.opponent || !formData.date) {
-      showNotice('Please complete required fields.', 'error');
-      return;
+    const isHomeTournament = formData.locationType === 'Home Tournament';
+    const isRoadTournament = formData.locationType === 'Road Tournament';
+    
+    if (isHomeTournament || isRoadTournament) {
+      if (!formData.tournamentGames || formData.tournamentGames.length === 0) {
+        showNotice('Please add at least one game to the tournament setup.', 'error');
+        return;
+      }
+      if (isHomeTournament && Number(formData.tournamentAdditionalCost || 0) > 0 && !formData.tournamentAdditionalCostReason?.trim()) {
+        showNotice('Please provide an explanation and breakdown for additional anticipated tournament costs.', 'error');
+        return;
+      }
+    } else {
+      if (!formData.opponent || !formData.date) {
+        showNotice('Please complete required fields.', 'error');
+        return;
+      }
     }
 
     if (editingScheduleId && originalApprovedSnapshot && !changeReason.trim()) {
@@ -961,11 +1068,14 @@ export default function App() {
 
     const selectedVenue = venues.find(v => v.id === formData.venueId);
     const isHomeType = formData.locationType === 'Home' || formData.locationType === 'Home Tournament';
-    const venueName = isHomeType && selectedVenue ? selectedVenue.name : (formData.locationType === 'Neutral' ? (formData.neutralLocationName || 'Neutral Site') : 'Away Contest');
+    const venueName = isHomeType && selectedVenue ? selectedVenue.name : (formData.locationType === 'Neutral' ? (formData.neutralLocationName || 'Neutral Site') : (isRoadTournament ? (formData.roadTourneyHostedAtSchool === 'yes' ? formData.roadTourneyHostSchool : formData.roadTourneyLocation) : 'Away Contest'));
     const sportConfig = sportConfigs[formData.sport] || {};
 
     const submissionPayload = {
       ...formData,
+      opponent: isHomeTournament || isRoadTournament ? 'Tournament Field (' + formData.tournamentGames.length + ' Games)' : formData.opponent,
+      date: (isHomeTournament || isRoadTournament) && formData.tournamentGames[0] ? formData.tournamentGames[0].date : formData.date,
+      time: (isHomeTournament || isRoadTournament) && formData.tournamentGames[0] ? formData.tournamentGames[0].time : formData.time,
       venueName,
       warmupMinutes: sportConfig.warmupMinutes || 45,
       teardownMinutes: isHomeType ? 0 : (sportConfig.teardownMinutes || 30),
@@ -1843,51 +1953,392 @@ export default function App() {
                     </select>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Opponent Institution</label>
-                    <div className="flex gap-2">
-                      <select value={formData.opponent} onChange={(e) => handleOpponentOrTripChange({ opponent: e.target.value })} className={`flex-1 ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
-                        <option value="">Select Opponent</option>
-                        {opponents.map(o => <option key={o.id} value={o.name}>{o.name}</option>)}
-                      </select>
+                  {formData.locationType !== 'Home Tournament' && formData.locationType !== 'Road Tournament' && (
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1">Opponent Institution</label>
+                      <div className="flex gap-2">
+                        <select value={formData.opponent} onChange={(e) => handleOpponentOrTripChange({ opponent: e.target.value })} className={`flex-1 ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
+                          <option value="">Select Opponent</option>
+                          {opponents.map(o => <option key={o.id} value={o.name}>{o.name}</option>)}
+                        </select>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {formData.locationType === 'Home' || formData.locationType === 'Home Tournament' ? (
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-400 mb-1">Home Venue</label>
-                      <select value={formData.venueId} onChange={(e) => setFormData({...formData, venueId: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
-                        {venues.map(v => <option key={v.id} value={v.id}>{v.name} ({v.type})</option>)}
-                      </select>
+                {/* Tournament Dynamic Game Setup */}
+                {formData.locationType === 'Home Tournament' ? (
+                  <div className={`p-4 ${darkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-slate-50 border-slate-200'} border rounded-xl space-y-4`}>
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wide">Tournament Game Matchups Setup</h4>
+                      <button type="button" onClick={() => {
+                        const currentGames = formData.tournamentGames || [];
+                        const newGames = [...currentGames, { id: 'tg-' + Date.now(), date: '', time: '14:00', matchup: '', isTbaTime: false, isTbaOpponent: false }];
+                        handleOpponentOrTripChange({ tournamentGames: newGames });
+                      }} className="px-3 py-1 bg-indigo-600 text-white rounded-lg text-xs font-semibold">+ Add Game</button>
                     </div>
-                  ) : formData.locationType === 'Neutral' ? (
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-400 mb-1">Neutral Site Name</label>
-                      <input type="text" value={formData.neutralLocationName} onChange={(e) => setFormData({...formData, neutralLocationName: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="e.g. City Convention Center" />
+
+                    <div className="space-y-3">
+                      {(formData.tournamentGames || []).map((game, idx) => (
+                        <div key={game.id || idx} className={`p-3 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-300'} border rounded-xl grid grid-cols-1 md:grid-cols-4 gap-3 items-center text-xs`}>
+                          <div>
+                            <span className="text-[10px] text-slate-400 block mb-1">Game Date</span>
+                            <input type="date" required value={game.date} onChange={(e) => {
+                              const updated = [...formData.tournamentGames];
+                              updated[idx].date = e.target.value;
+                              handleOpponentOrTripChange({ tournamentGames: updated });
+                            }} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-lg px-2 py-1.5 text-xs`} />
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 block mb-1">Game Time</span>
+                            {game.isTbaTime ? (
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-amber-400 py-1.5">TBA / Unknown</span>
+                                <button type="button" onClick={() => {
+                                  const updated = [...formData.tournamentGames];
+                                  updated[idx].isTbaTime = false;
+                                  handleOpponentOrTripChange({ tournamentGames: updated });
+                                }} className="text-[10px] text-indigo-400 underline">Set Time</button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <input type="time" required value={game.time} onChange={(e) => {
+                                  const updated = [...formData.tournamentGames];
+                                  updated[idx].time = e.target.value;
+                                  handleOpponentOrTripChange({ tournamentGames: updated });
+                                }} className={`flex-1 ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-lg px-2 py-1.5 text-xs`} />
+                                <button type="button" onClick={() => {
+                                  const updated = [...formData.tournamentGames];
+                                  updated[idx].isTbaTime = true;
+                                  handleOpponentOrTripChange({ tournamentGames: updated });
+                                }} className="text-[10px] text-amber-400 font-semibold px-1 py-1 bg-amber-500/10 rounded">TBA</button>
+                              </div>
+                            )}
+                          </div>
+                          <div className="md:col-span-1">
+                            <span className="text-[10px] text-slate-400 block mb-1">Game Matchup</span>
+                            <input type="text" placeholder="e.g. Team A vs Team B" value={game.matchup} onChange={(e) => {
+                              const updated = [...formData.tournamentGames];
+                              updated[idx].matchup = e.target.value;
+                              handleOpponentOrTripChange({ tournamentGames: updated });
+                            }} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-lg px-2 py-1.5 text-xs`} />
+                          </div>
+                          <div className="flex justify-end pt-4 md:pt-0">
+                            <button type="button" onClick={() => {
+                              const updated = formData.tournamentGames.filter((_, i) => i !== idx);
+                              handleOpponentOrTripChange({ tournamentGames: updated });
+                            }} className="text-rose-400 hover:text-rose-300 font-bold px-2">Remove</button>
+                          </div>
+                        </div>
+                      ))}
+                      {(!formData.tournamentGames || formData.tournamentGames.length === 0) && (
+                        <p className="text-xs text-rose-400 italic text-center py-2">Please click "+ Add Game" to add at least one tournament matchup.</p>
+                      )}
                     </div>
-                  ) : (
+
+                    <div className={`p-3 ${darkMode ? 'bg-slate-950/80 border-slate-800' : 'bg-white border-slate-200'} border rounded-xl space-y-3`}>
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="font-semibold text-slate-300">Officiating and Staffing Anticipated Costs:</span>
+                        <span className="text-emerald-400 font-bold text-sm">${formData.hostingCost.toLocaleString()}</span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-slate-800">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 mb-1">Additional Anticipated Costs Associated with Hosting ($)</label>
+                          <input type="number" min="0" value={formData.tournamentAdditionalCost} onChange={(e) => {
+                            const val = Number(e.target.value);
+                            handleOpponentOrTripChange({ tournamentAdditionalCost: val });
+                          }} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 mb-1">Explanation & Breakdown for Additional Costs</label>
+                          <input type="text" placeholder="e.g. Extra security, custodial fees, equipment rental" value={formData.tournamentAdditionalCostReason} onChange={(e) => {
+                            handleOpponentOrTripChange({ tournamentAdditionalCostReason: e.target.value });
+                          }} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : formData.locationType === 'Road Tournament' ? (
+                  <div className={`p-4 ${darkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-slate-50 border-slate-200'} border rounded-xl space-y-4 text-xs`}>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 mb-1">Is this hosted at a school?</label>
+                        <select value={formData.roadTourneyHostedAtSchool} onChange={(e) => handleOpponentOrTripChange({ roadTourneyHostedAtSchool: e.target.value })} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-xs`}>
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </div>
+
+                      {formData.roadTourneyHostedAtSchool === 'yes' ? (
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 mb-1">Host School / Institution</label>
+                          <select value={formData.roadTourneyHostSchool} onChange={(e) => handleOpponentOrTripChange({ roadTourneyHostSchool: e.target.value, opponent: e.target.value })} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-xs`}>
+                            <option value="">Select Host School</option>
+                            {opponents.map(o => <option key={o.id} value={o.name}>{o.name} ({o.location})</option>)}
+                          </select>
+                        </div>
+                      ) : (
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 mb-1">Location / Facility Name</label>
+                          <input type="text" placeholder="e.g. City Sportsplex" value={formData.roadTourneyLocation} onChange={(e) => handleOpponentOrTripChange({ roadTourneyLocation: e.target.value, opponent: e.target.value })} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-xs`} />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* LIST YOUR GAME SCHEDULE AT THIS TOURNAMENT */}
+                    <div className={`p-3 ${darkMode ? 'bg-slate-950/80 border-slate-800' : 'bg-white border-slate-200'} border rounded-xl space-y-3`}>
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wide">LIST YOUR GAME SCHEDULE AT THIS TOURNAMENT</h4>
+                        <button type="button" onClick={() => {
+                          const currentGames = formData.tournamentGames || [];
+                          const newGames = [...currentGames, { id: 'tg-' + Date.now(), date: '', time: '14:00', matchup: '', isTbaTime: false, isTbaOpponent: false }];
+                          handleOpponentOrTripChange({ tournamentGames: newGames });
+                        }} className="px-3 py-1 bg-indigo-600 text-white rounded-lg text-xs font-semibold">+ Add Game</button>
+                      </div>
+
+                      <div className="space-y-3">
+                        {(formData.tournamentGames || []).map((game, idx) => (
+                          <div key={game.id || idx} className={`p-3 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-300'} border rounded-xl grid grid-cols-1 md:grid-cols-4 gap-3 items-center text-xs`}>
+                            <div>
+                              <span className="text-[10px] text-slate-400 block mb-1">Game Date</span>
+                              <input type="date" required value={game.date} onChange={(e) => {
+                                const updated = [...formData.tournamentGames];
+                                updated[idx].date = e.target.value;
+                                handleOpponentOrTripChange({ tournamentGames: updated });
+                              }} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-lg px-2 py-1.5 text-xs`} />
+                            </div>
+                            <div>
+                              <span className="text-[10px] text-slate-400 block mb-1">Game Time</span>
+                              {game.isTbaTime ? (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-bold text-amber-400 py-1.5">TBA / Unknown</span>
+                                  <button type="button" onClick={() => {
+                                    const updated = [...formData.tournamentGames];
+                                    updated[idx].isTbaTime = false;
+                                    handleOpponentOrTripChange({ tournamentGames: updated });
+                                  }} className="text-[10px] text-indigo-400 underline">Set Time</button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <input type="time" required value={game.time} onChange={(e) => {
+                                    const updated = [...formData.tournamentGames];
+                                    updated[idx].time = e.target.value;
+                                    handleOpponentOrTripChange({ tournamentGames: updated });
+                                  }} className={`flex-1 ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-lg px-2 py-1.5 text-xs`} />
+                                  <button type="button" onClick={() => {
+                                    const updated = [...formData.tournamentGames];
+                                    updated[idx].isTbaTime = true;
+                                    handleOpponentOrTripChange({ tournamentGames: updated });
+                                  }} className="text-[10px] text-amber-400 font-semibold px-1 py-1 bg-amber-500/10 rounded">TBA</button>
+                                </div>
+                              )}
+                            </div>
+                            <div>
+                              <span className="text-[10px] text-slate-400 block mb-1">Opponent / Matchup</span>
+                              {game.isTbaOpponent ? (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-bold text-amber-400 py-1.5">TBA / Unknown</span>
+                                  <button type="button" onClick={() => {
+                                    const updated = [...formData.tournamentGames];
+                                    updated[idx].isTbaOpponent = false;
+                                    handleOpponentOrTripChange({ tournamentGames: updated });
+                                  }} className="text-[10px] text-indigo-400 underline">Set Opp.</button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <input type="text" placeholder="e.g. vs State Tech" value={game.matchup} onChange={(e) => {
+                                    const updated = [...formData.tournamentGames];
+                                    updated[idx].matchup = e.target.value;
+                                    handleOpponentOrTripChange({ tournamentGames: updated });
+                                  }} className={`flex-1 ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-lg px-2 py-1.5 text-xs`} />
+                                  <button type="button" onClick={() => {
+                                    const updated = [...formData.tournamentGames];
+                                    updated[idx].isTbaOpponent = true;
+                                    updated[idx].matchup = 'TBA Opponent';
+                                    handleOpponentOrTripChange({ tournamentGames: updated });
+                                  }} className="text-[10px] text-amber-400 font-semibold px-1 py-1 bg-amber-500/10 rounded">TBA</button>
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex justify-end pt-4 md:pt-0">
+                              <button type="button" onClick={() => {
+                                const updated = formData.tournamentGames.filter((_, i) => i !== idx);
+                                handleOpponentOrTripChange({ tournamentGames: updated });
+                              }} className="text-rose-400 hover:text-rose-300 font-bold px-2">Remove</button>
+                            </div>
+                          </div>
+                        ))}
+                        {(!formData.tournamentGames || formData.tournamentGames.length === 0) && (
+                          <p className="text-xs text-rose-400 italic text-center py-2">Please click "+ Add Game" to add at least one game matchup.</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Departure / Return times */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className={`p-3 ${darkMode ? 'bg-slate-950/80 border-slate-800' : 'bg-white border-slate-200'} border rounded-xl space-y-2`}>
+                        <span className="font-semibold text-slate-300 block">Departure from Campus</span>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <span className="text-[10px] text-slate-400 block mb-1">Date</span>
+                            <input type="date" value={formData.departureDate} onChange={(e) => handleOpponentOrTripChange({ departureDate: e.target.value })} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-lg px-2 py-1.5 text-xs`} />
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 block mb-1">Time</span>
+                            <input type="time" value={formData.departureTime} onChange={(e) => handleOpponentOrTripChange({ departureTime: e.target.value })} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-lg px-2 py-1.5 text-xs`} />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className={`p-3 ${darkMode ? 'bg-slate-950/80 border-slate-800' : 'bg-white border-slate-200'} border rounded-xl space-y-2`}>
+                        <span className="font-semibold text-slate-300 block">Return to Campus</span>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <span className="text-[10px] text-slate-400 block mb-1">Date</span>
+                            <input type="date" value={formData.returnDate} onChange={(e) => handleOpponentOrTripChange({ returnDate: e.target.value })} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-lg px-2 py-1.5 text-xs`} />
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 block mb-1">Time</span>
+                            <input type="time" value={formData.returnTime} onChange={(e) => handleOpponentOrTripChange({ returnTime: e.target.value })} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-lg px-2 py-1.5 text-xs`} />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
                     <div>
-                      <label className="block text-xs font-semibold text-slate-400 mb-1">Travel Mode</label>
-                      <select value={formData.travelMode} onChange={(e) => handleOpponentOrTripChange({ travelMode: e.target.value })} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1">Transportation Mode From School</label>
+                      <select value={formData.travelMode} onChange={(e) => handleOpponentOrTripChange({ travelMode: e.target.value })} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-xs`}>
                         {transportModes.map(tm => <option key={tm.id} value={tm.modeName}>{tm.modeName}</option>)}
                       </select>
                     </div>
-                  )}
 
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Date</label>
-                    <input type="date" required value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                    {/* ANTICIPATED BREAKDOWN OF COSTS */}
+                    <div className={`p-4 ${darkMode ? 'bg-slate-950/80 border-slate-800' : 'bg-white border-slate-200'} border rounded-xl space-y-3`}>
+                      <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wide">ANTICIPATED BREAKDOWN OF COSTS</h4>
+                      <p className="text-[11px] text-slate-400">Total Estimated Cost: <span className="text-emerald-400 font-bold">${(formData.travelCost + formData.hotelCost + formData.mealCost + formData.hostingCost).toLocaleString()}</span></p>
+                      
+                      <div className="space-y-2 pt-2">
+                        {/* Transportation */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-center">
+                          <span className="font-semibold">Additional Transportation ($):</span>
+                          <input type="number" min="0" value={formData.roadTourneyAdditionalCosts.transportation.amount} onChange={(e) => {
+                            const val = Number(e.target.value);
+                            const updated = { ...formData.roadTourneyAdditionalCosts, transportation: { ...formData.roadTourneyAdditionalCosts.transportation, amount: val } };
+                            handleOpponentOrTripChange({ roadTourneyAdditionalCosts: updated });
+                          }} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-lg px-2 py-1 text-xs`} />
+                          <input type="text" placeholder="Explanation" value={formData.roadTourneyAdditionalCosts.transportation.explanation} onChange={(e) => {
+                            const val = e.target.value;
+                            const updated = { ...formData.roadTourneyAdditionalCosts, transportation: { ...formData.roadTourneyAdditionalCosts.transportation, explanation: val } };
+                            handleOpponentOrTripChange({ roadTourneyAdditionalCosts: updated });
+                          }} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-lg px-2 py-1 text-xs`} />
+                        </div>
+
+                        {/* Hotel */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-center">
+                          <span className="font-semibold">Hotel / Lodging ($):</span>
+                          <input type="number" min="0" value={formData.roadTourneyAdditionalCosts.hotel.amount} onChange={(e) => {
+                            const val = Number(e.target.value);
+                            const updated = { ...formData.roadTourneyAdditionalCosts, hotel: { ...formData.roadTourneyAdditionalCosts.hotel, amount: val } };
+                            handleOpponentOrTripChange({ roadTourneyAdditionalCosts: updated });
+                          }} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-lg px-2 py-1 text-xs`} />
+                          <input type="text" placeholder="Explanation" value={formData.roadTourneyAdditionalCosts.hotel.explanation} onChange={(e) => {
+                            const val = e.target.value;
+                            const updated = { ...formData.roadTourneyAdditionalCosts, hotel: { ...formData.roadTourneyAdditionalCosts.hotel, explanation: val } };
+                            handleOpponentOrTripChange({ roadTourneyAdditionalCosts: updated });
+                          }} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-lg px-2 py-1 text-xs`} />
+                        </div>
+
+                        {/* Entry Fee */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-center">
+                          <span className="font-semibold">Entry Fee ($):</span>
+                          <input type="number" min="0" value={formData.roadTourneyAdditionalCosts.entryFee.amount} onChange={(e) => {
+                            const val = Number(e.target.value);
+                            const updated = { ...formData.roadTourneyAdditionalCosts, entryFee: { ...formData.roadTourneyAdditionalCosts.entryFee, amount: val } };
+                            handleOpponentOrTripChange({ roadTourneyAdditionalCosts: updated });
+                          }} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-lg px-2 py-1 text-xs`} />
+                          <input type="text" placeholder="Explanation" value={formData.roadTourneyAdditionalCosts.entryFee.explanation} onChange={(e) => {
+                            const val = e.target.value;
+                            const updated = { ...formData.roadTourneyAdditionalCosts, entryFee: { ...formData.roadTourneyAdditionalCosts.entryFee, explanation: val } };
+                            handleOpponentOrTripChange({ roadTourneyAdditionalCosts: updated });
+                          }} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-lg px-2 py-1 text-xs`} />
+                        </div>
+
+                        {/* Meals */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-center">
+                          <span className="font-semibold">Meals ($):</span>
+                          <input type="number" min="0" value={formData.roadTourneyAdditionalCosts.meals.amount} onChange={(e) => {
+                            const val = Number(e.target.value);
+                            const updated = { ...formData.roadTourneyAdditionalCosts, meals: { ...formData.roadTourneyAdditionalCosts.meals, amount: val } };
+                            handleOpponentOrTripChange({ roadTourneyAdditionalCosts: updated });
+                          }} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-lg px-2 py-1 text-xs`} />
+                          <input type="text" placeholder="Explanation" value={formData.roadTourneyAdditionalCosts.meals.explanation} onChange={(e) => {
+                            const val = e.target.value;
+                            const updated = { ...formData.roadTourneyAdditionalCosts, meals: { ...formData.roadTourneyAdditionalCosts.meals, explanation: val } };
+                            handleOpponentOrTripChange({ roadTourneyAdditionalCosts: updated });
+                          }} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-lg px-2 py-1 text-xs`} />
+                        </div>
+
+                        {/* Other */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-center">
+                          <span className="font-semibold">Other Costs ($):</span>
+                          <input type="number" min="0" value={formData.roadTourneyAdditionalCosts.other.amount} onChange={(e) => {
+                            const val = Number(e.target.value);
+                            const updated = { ...formData.roadTourneyAdditionalCosts, other: { ...formData.roadTourneyAdditionalCosts.other, amount: val } };
+                            handleOpponentOrTripChange({ roadTourneyAdditionalCosts: updated });
+                          }} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-lg px-2 py-1 text-xs`} />
+                          <input type="text" placeholder="Explanation (Required if > 0)" value={formData.roadTourneyAdditionalCosts.other.explanation} onChange={(e) => {
+                            const val = e.target.value;
+                            const updated = { ...formData.roadTourneyAdditionalCosts, other: { ...formData.roadTourneyAdditionalCosts.other, explanation: val } };
+                            handleOpponentOrTripChange({ roadTourneyAdditionalCosts: updated });
+                          }} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-lg px-2 py-1 text-xs`} />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Notes field with instructions */}
+                    <div className="p-3 bg-indigo-600/10 border border-indigo-500/30 rounded-xl space-y-1">
+                      <strong className="text-indigo-400 block font-semibold">Reimbursement & Travel Instructions:</strong>
+                      <p className="text-slate-300 text-[11px]">Please provide any reimbursement (and source) to offset the cost as well as other information such as if a flight is involved and/or if you will be returning to and departing campus daily.</p>
+                      <textarea value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} rows={3} className={`w-full mt-2 ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-xs`} placeholder="Enter reimbursement details, flight information, or daily campus return notes..." />
+                    </div>
+
                   </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {formData.locationType === 'Home' ? (
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 mb-1">Home Venue</label>
+                        <select value={formData.venueId} onChange={(e) => setFormData({...formData, venueId: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
+                          {venues.map(v => <option key={v.id} value={v.id}>{v.name} ({v.type})</option>)}
+                        </select>
+                      </div>
+                    ) : formData.locationType === 'Neutral' ? (
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 mb-1">Neutral Site Name</label>
+                        <input type="text" value={formData.neutralLocationName} onChange={(e) => setFormData({...formData, neutralLocationName: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="e.g. City Convention Center" />
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 mb-1">Travel Mode</label>
+                        <select value={formData.travelMode} onChange={(e) => handleOpponentOrTripChange({ travelMode: e.target.value })} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
+                          {transportModes.map(tm => <option key={tm.id} value={tm.modeName}>{tm.modeName}</option>)}
+                        </select>
+                      </div>
+                    )}
 
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Start Time</label>
-                    <input type="time" required value={formData.time} onChange={(e) => setFormData({...formData, time: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1">Date</label>
+                      <input type="date" required value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1">Start Time</label>
+                      <input type="time" required value={formData.time} onChange={(e) => setFormData({...formData, time: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                    </div>
                   </div>
-                </div>
+                )}
 
-                {formData.locationType !== 'Home' && formData.locationType !== 'Home Tournament' && (
+                {formData.locationType !== 'Home' && formData.locationType !== 'Home Tournament' && formData.locationType !== 'Road Tournament' && (
                   <div className={`p-4 ${darkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-slate-50 border-slate-200'} border rounded-xl space-y-4`}>
                     <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wide">Road / Neutral Travel Parameters</h4>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1909,10 +2360,12 @@ export default function App() {
                   </div>
                 )}
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Special Notes / Details</label>
-                  <textarea value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} rows={2} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="Add any special notes..." />
-                </div>
+                {formData.locationType !== 'Road Tournament' && (
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Special Notes / Details</label>
+                    <textarea value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} rows={2} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="Add any special notes..." />
+                  </div>
+                )}
 
                 <div className="flex justify-end space-x-3 pt-3">
                   <button type="button" onClick={() => setActiveTab('dashboard')} className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white">Cancel</button>
