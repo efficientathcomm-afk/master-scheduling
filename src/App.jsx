@@ -1277,11 +1277,6 @@ export default function App() {
             <span>Venue Matrix View</span>
           </button>
 
-          <button onClick={() => { setEditingScheduleId(null); setActiveTab('submit'); }} className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all ${activeTab === 'submit' ? (darkMode ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20' : 'bg-indigo-50 text-indigo-700 font-semibold border border-indigo-200') : (darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-700 hover:text-slate-900')}`}>
-            <Plus className="w-4 h-4" />
-            <span>{role === 'admin' ? 'Add Schedule Event' : 'Submit / Request'}</span>
-          </button>
-
           <button onClick={() => setActiveTab('sports')} className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all ${activeTab === 'sports' ? (darkMode ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20' : 'bg-indigo-50 text-indigo-700 font-semibold border border-indigo-200') : (darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-700 hover:text-slate-900')}`}>
             <Trophy className="w-4 h-4" />
             <span>Sports Management</span>
@@ -1339,23 +1334,23 @@ export default function App() {
                     <Plus className="w-3.5 h-3.5"/> Import from CSV
                     <input type="file" accept=".csv" onChange={handleCSVImport} className="hidden" />
                   </label>
-                  <button onClick={() => openAddEventWithType('Home')} className={`px-3.5 py-2 rounded-xl text-xs font-semibold border ${darkMode ? 'bg-slate-900 border-slate-700 text-slate-200 hover:bg-slate-800' : 'bg-slate-100 border-slate-300 text-slate-800 hover:bg-slate-200'}`}>
+                  <button onClick={() => openAddEventWithType('Home')} className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold shadow">
                     + Add Home Event
                   </button>
-                  <button onClick={() => openAddEventWithType('Away')} className={`px-3.5 py-2 rounded-xl text-xs font-semibold border ${darkMode ? 'bg-slate-900 border-slate-700 text-slate-200 hover:bg-slate-800' : 'bg-slate-100 border-slate-300 text-slate-800 hover:bg-slate-200'}`}>
+                  <button onClick={() => openAddEventWithType('Away')} className="px-3.5 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-semibold shadow">
                     + Add Road Event
                   </button>
-                  <button onClick={() => openAddEventWithType('Neutral')} className={`px-3.5 py-2 rounded-xl text-xs font-semibold border ${darkMode ? 'bg-slate-900 border-slate-700 text-slate-200 hover:bg-slate-800' : 'bg-slate-100 border-slate-300 text-slate-800 hover:bg-slate-200'}`}>
+                  <button onClick={() => openAddEventWithType('Neutral')} className="px-3.5 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-semibold shadow">
                     + Add Neutral Site Event
                   </button>
-                  <button onClick={() => openAddEventWithType('Home Tournament')} className={`px-3.5 py-2 rounded-xl text-xs font-semibold border ${darkMode ? 'bg-slate-900 border-slate-700 text-slate-200 hover:bg-slate-800' : 'bg-slate-100 border-slate-300 text-slate-800 hover:bg-slate-200'}`}>
+                  <button onClick={() => openAddEventWithType('Home Tournament')} className="px-3.5 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-xs font-semibold shadow">
                     + Add Home Tournament
                   </button>
-                  <button onClick={() => openAddEventWithType('Road Tournament')} className={`px-3.5 py-2 rounded-xl text-xs font-semibold border ${darkMode ? 'bg-slate-900 border-slate-700 text-slate-200 hover:bg-slate-800' : 'bg-slate-100 border-slate-300 text-slate-800 hover:bg-slate-200'}`}>
+                  <button onClick={() => openAddEventWithType('Road Tournament')} className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow">
                     + Add Road Tournament
                   </button>
                   {role === 'admin' && (
-                    <button onClick={() => openAddEventWithType('Postseason')} className="px-3.5 py-2 bg-purple-600/20 border border-purple-500/30 text-purple-300 hover:bg-purple-600/30 rounded-xl text-xs font-semibold">
+                    <button onClick={() => openAddEventWithType('Postseason')} className="px-3.5 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-semibold shadow">
                       + Add Postseason (Admin)
                     </button>
                   )}
