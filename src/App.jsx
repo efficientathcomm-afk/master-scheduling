@@ -2597,6 +2597,15 @@ export default function App() {
                             <div className="flex flex-wrap items-center gap-2">
                               <button onClick={() => handleConfirmPostseasonRound(ps.sport, r.roundName, r.date, r.venueId, 'Home')} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-semibold shadow">Confirm as Home Event</button>
                               <button onClick={() => handleConfirmPostseasonRound(ps.sport, r.roundName, r.date, r.venueId, 'Away')} className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-semibold shadow">Confirm as Road Event</button>
+                              <button onClick={() => {
+                                if (window.confirm(`Are you sure you want to remove round "${r.roundName}"?`)) {
+                                  const updatedRounds = ps.rounds.filter((_, i) => i !== idx);
+                                  const updatedPostseasons = postseasons.map(p => p.id === ps.id ? { ...p, rounds: updatedRounds } : p);
+                                  setPostseasons(updatedPostseasons);
+                                  localStorage.setItem('app_postseasons', JSON.stringify(updatedPostseasons));
+                                  showNotice('Postseason round removed.');
+                                }
+                              }} className="px-3 py-1.5 bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 rounded-lg font-semibold shadow">Remove Round</button>
                             </div>
                           </div>
                         );
