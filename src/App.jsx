@@ -1024,7 +1024,7 @@ export default function App() {
   };
 
   const budgetSummary = useMemo(() => {
-    let totalTravel = 0, totalMeals = 0, totalHotel = 0, totalHosting = 0, totalStudentWorkers = 0;
+    let totalTravel = 0, totalMeals = 0, totalHotel = 0, totalHosting = 0, totalStudentWorkers = 0, totalStaffing = 0, totalOfficials = 0;
     const bySport = {};
 
     schedules.forEach(s => {
@@ -1037,27 +1037,34 @@ export default function App() {
       const config = sportConfigs[s.sport] || {};
       const isHome = s.locationType === 'Home' || s.locationType === 'Tournament';
       const swCost = isHome ? (Number(config.studentStaffCount || 4) * Number(studentWorkerConfig.hourlyRate || 15) * (Number(s.durationHours || 2.5) + (Number(studentWorkerConfig.prepAndTeardownMinutes || 90) / 60))) : 0;
+      
+      const officialsAmt = isHome ? Number(config.officialsCost || 600) : 0;
+      const staffingAmt = isHome ? Number(config.staffCost || calculateStaffCostForConfig(config.assignedStaffRoles) || 350) : 0;
 
       totalTravel += t;
       totalMeals += m;
       totalHotel += h;
       totalHosting += host;
       totalStudentWorkers += swCost;
+      totalStaffing += staffingAmt;
+      totalOfficials += officialsAmt;
 
       if (!bySport[s.sport]) {
-        bySport[s.sport] = { travel: 0, meals: 0, hotel: 0, hosting: 0, studentWorkers: 0, count: 0 };
+        bySport[s.sport] = { travel: 0, meals: 0, hotel: 0, hosting: 0, studentWorkers: 0, staffing: 0, officials: 0, count: 0 };
       }
       bySport[s.sport].travel += t;
       bySport[s.sport].meals += m;
       bySport[s.sport].hotel += h;
       bySport[s.sport].hosting += host;
       bySport[s.sport].studentWorkers += swCost;
+      bySport[s.sport].staffing += staffingAmt;
+      bySport[s.sport].officials += officialsAmt;
       bySport[s.sport].count += 1;
     });
 
     const grandTotal = totalTravel + totalMeals + totalHotel + totalHosting;
-    return { totalTravel, totalMeals, totalHotel, totalHosting, totalStudentWorkers, grandTotal, bySport };
-  }, [schedules, studentWorkerConfig, sportConfigs]);
+    return { totalTravel, totalMeals, totalHotel, totalHosting, totalStudentWorkers, totalStaffing, totalOfficials, grandTotal, bySport };
+  }, [schedules, studentWorkerConfig, sportConfigs, staffRoles]);
 
   const displayedSchedules = useMemo(() => {
     let list = schedules;
@@ -2359,26 +2366,30 @@ export default function App() {
                 </div>
               ) : budgetSubTab === 'summary' ? (
                 <>
-                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                    <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border p-4 rounded-2xl`}>
-                      <p className="text-xs text-slate-400">Transportation</p>
-                      <h3 className="text-lg font-bold text-indigo-400 mt-1">${budgetSummary.totalTravel.toLocaleString()}</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
+                    <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border p-3.5 rounded-2xl`}>
+                      <p className="text-[11px] text-slate-400 font-medium">Transportation</p>
+                      <h3 className="text-base font-bold text-sky-400 mt-1">${budgetSummary.totalTravel.toLocaleString()}</h3>
                     </div>
-                    <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border p-4 rounded-2xl`}>
-                      <p className="text-xs text-slate-400">Lodging (Hotel)</p>
-                      <h3 className="text-lg font-bold text-amber-400 mt-1">${budgetSummary.totalHotel.toLocaleString()}</h3>
+                    <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border p-3.5 rounded-2xl`}>
+                      <p className="text-[11px] text-slate-400 font-medium">Lodging</p>
+                      <h3 className="text-base font-bold text-amber-400 mt-1">${budgetSummary.totalHotel.toLocaleString()}</h3>
                     </div>
-                    <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border p-4 rounded-2xl`}>
-                      <p className="text-xs text-slate-400">Per Diem Meals</p>
-                      <h3 className="text-lg font-bold text-emerald-400 mt-1">${budgetSummary.totalMeals.toLocaleString()}</h3>
+                    <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border p-3.5 rounded-2xl`}>
+                      <p className="text-[11px] text-slate-400 font-medium">Meals</p>
+                      <h3 className="text-base font-bold text-emerald-400 mt-1">${budgetSummary.totalMeals.toLocaleString()}</h3>
                     </div>
-                    <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border p-4 rounded-2xl`}>
-                      <p className="text-xs text-slate-400">Student Workers</p>
-                      <h3 className="text-lg font-bold text-blue-400 mt-1">${budgetSummary.totalStudentWorkers.toLocaleString()}</h3>
+                    <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border p-3.5 rounded-2xl`}>
+                      <p className="text-[11px] text-slate-400 font-medium">Officials</p>
+                      <h3 className="text-base font-bold text-rose-400 mt-1">${budgetSummary.totalOfficials.toLocaleString()}</h3>
                     </div>
-                    <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border p-4 rounded-2xl`}>
-                      <p className="text-xs text-slate-400">Officials & Staff</p>
-                      <h3 className="text-lg font-bold text-purple-400 mt-1">${budgetSummary.totalHosting.toLocaleString()}</h3>
+                    <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border p-3.5 rounded-2xl`}>
+                      <p className="text-[11px] text-slate-400 font-medium">Operational Staffing</p>
+                      <h3 className="text-base font-bold text-purple-400 mt-1">${budgetSummary.totalStaffing.toLocaleString()}</h3>
+                    </div>
+                    <div className={`${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300 shadow-md'} border p-3.5 rounded-2xl`}>
+                      <p className="text-[11px] text-slate-400 font-medium">Student Workers</p>
+                      <h3 className="text-base font-bold text-cyan-400 mt-1">${budgetSummary.totalStudentWorkers.toLocaleString()}</h3>
                     </div>
                   </div>
 
@@ -2391,17 +2402,18 @@ export default function App() {
                           <tr className={`border-b ${darkMode ? 'border-slate-800 text-slate-400' : 'border-slate-200 text-slate-600'}`}>
                             <th className="pb-3 font-semibold">Sport</th>
                             <th className="pb-3 font-semibold">Events</th>
-                            <th className="pb-3 font-semibold">Travel</th>
-                            <th className="pb-3 font-semibold">Hotel</th>
+                            <th className="pb-3 font-semibold">Transportation</th>
+                            <th className="pb-3 font-semibold">Lodging</th>
                             <th className="pb-3 font-semibold">Meals</th>
+                            <th className="pb-3 font-semibold">Officials</th>
+                            <th className="pb-3 font-semibold">Operational Staff</th>
                             <th className="pb-3 font-semibold">Student Wk</th>
-                            <th className="pb-3 font-semibold">Hosting/Other</th>
                             <th className="pb-3 font-semibold text-right">Total</th>
                           </tr>
                         </thead>
                         <tbody className={`divide-y ${darkMode ? 'divide-slate-900' : 'divide-slate-200'}`}>
                           {Object.entries(budgetSummary.bySport).map(([sport, b]) => {
-                            const subTotal = b.travel + b.meals + b.hotel + b.hosting + b.studentWorkers;
+                            const subTotal = b.travel + b.meals + b.hotel + b.officials + b.staffing + b.studentWorkers;
                             return (
                               <tr key={sport} onClick={() => setSelectedSportDetail(sport)} className="cursor-pointer hover:bg-indigo-600/10 transition-colors">
                                 <td className={`py-3 font-bold text-indigo-400 flex items-center gap-1.5`}>{sport} <ChevronRight className="w-3 h-3"/></td>
@@ -2409,8 +2421,9 @@ export default function App() {
                                 <td className="py-3 text-slate-400">${b.travel.toLocaleString()}</td>
                                 <td className="py-3 text-slate-400">${b.hotel.toLocaleString()}</td>
                                 <td className="py-3 text-slate-400">${b.meals.toLocaleString()}</td>
+                                <td className="py-3 text-slate-400">${b.officials.toLocaleString()}</td>
+                                <td className="py-3 text-slate-400">${b.staffing.toLocaleString()}</td>
                                 <td className="py-3 text-slate-400">${b.studentWorkers.toLocaleString()}</td>
-                                <td className="py-3 text-slate-400">${b.hosting.toLocaleString()}</td>
                                 <td className="py-3 text-right font-bold text-emerald-400">${subTotal.toLocaleString()}</td>
                               </tr>
                             );
