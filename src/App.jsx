@@ -2,8 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Calendar, Clock, MapPin, DollarSign, Users, Shield, AlertTriangle, 
   CheckCircle, XCircle, Plus, Filter, Search, ChevronRight, Download, 
-  Bus, Utensils, Award, FileText, Settings, RefreshCw, Layers, Check, X,
-  Grid, Globe, Compass, Briefcase, Eye, Edit3, Trash2, Cloud, CloudOff, Award as Trophy, Send, Sun, Moon
+  Bus, Utensils, FileText, Settings, RefreshCw, Layers, Check, X,
+  Grid, Globe, Compass, Briefcase, Eye, Edit3, Trash2, Cloud, CloudOff, Trophy, Send, Sun, Moon
 } from 'lucide-react';
 
 // --- FIREBASE IMPORTS ---
@@ -108,35 +108,42 @@ export default function App() {
   const [syncStatus, setSyncStatus] = useState('Local Mode Active');
   const [darkMode, setDarkMode] = useState(true);
 
-  // Application State
+  // Application State initialized with localStorage persistence
   const [role, setRole] = useState('admin'); // 'admin' | 'coach'
   const [currentUserSport, setCurrentUserSport] = useState('Football');
   const [schedules, setSchedules] = useState(INITIAL_SCHEDULES);
-  const [venues, setVenues] = useState(INITIAL_VENUES);
-  const [opponents, setOpponents] = useState(INITIAL_OPPONENTS);
-  const [sportConfigs, setSportConfigs] = useState(INITIAL_SPORT_CONFIGS);
-  const [staffRoles, setStaffRoles] = useState(INITIAL_STAFF_ROLES);
-  const [transportModes, setTransportModes] = useState(INITIAL_TRANSPORT_MODES);
+  
+  const [venues, setVenues] = useState(() => {
+    const saved = localStorage.getItem('app_venues');
+    return saved ? JSON.parse(saved) : INITIAL_VENUES;
+  });
+
+  const [opponents, setOpponents] = useState(() => {
+    const saved = localStorage.getItem('app_opponents');
+    return saved ? JSON.parse(saved) : INITIAL_OPPONENTS;
+  });
+
+  const [sportConfigs, setSportConfigs] = useState(() => {
+    const saved = localStorage.getItem('app_sport_configs');
+    return saved ? JSON.parse(saved) : INITIAL_SPORT_CONFIGS;
+  });
+
+  const [staffRoles, setStaffRoles] = useState(() => {
+    const saved = localStorage.getItem('app_staff_roles');
+    return saved ? JSON.parse(saved) : INITIAL_STAFF_ROLES;
+  });
+
+  const [transportModes, setTransportModes] = useState(() => {
+    const saved = localStorage.getItem('app_transport_modes');
+    return saved ? JSON.parse(saved) : INITIAL_TRANSPORT_MODES;
+  });
+
   const [studentWorkerConfig, setStudentWorkerConfig] = useState(INITIAL_STUDENT_WORKER_SETTINGS);
   
-  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'calendar', 'matrix', 'submit', 'venues', 'sports', 'opponents', 'budget', 'conflicts'
-  const [budgetSubTab, setBudgetSubTab] = useState('summary'); // 'summary', 'staffing', 'student-workers', 'transport', 'sport-detail'
-  const [selectedSportDetail, setSelectedSportDetail] = useState(null);
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [editingScheduleId, setEditingScheduleId] = useState(null);
 
-  // Modals
-  const [showOpponentModal, setShowOpponentModal] = useState(false);
-  const [editingOpponentId, setEditingOpponentId] = useState(null);
-  const [newOpponentData, setNewOpponentData] = useState({ name: '', location: '', distance: 100, travelTime: '2h 0m', isConference: true });
-
-  const [showStaffModal, setShowStaffModal] = useState(false);
-  const [editingStaffId, setEditingStaffId] = useState(null);
-  const [staffFormData, setStaffFormData] = useState({ roleName: '', rateType: 'hourly', rateValue: 18, defaultHours: 4 });
-
-  const [showTransportModal, setShowTransportModal] = useState(false);
-  const [transportFormData, setTransportFormData] = useState({ modeName: '', rateType: 'mileage', rateValue: 3.50 });
-  const [editingTransportId, setEditingTransportId] = useState(null);
-
+  // Modal display states
   const [showVenueModal, setShowVenueModal] = useState(false);
   const [editingVenue, setEditingVenue] = useState(null);
   const [venueFormData, setVenueFormData] = useState({ name: '', type: 'Outdoor Turf', capacity: 2000 });
@@ -157,6 +164,36 @@ export default function App() {
     rosterSize: 25,
     studentStaffCount: 4
   });
+
+  const [showOpponentModal, setShowOpponentModal] = useState(false);
+  const [editingOpponentId, setEditingOpponentId] = useState(null);
+  const [newOpponentData, setNewOpponentData] = useState({
+    name: '',
+    location: '',
+    distance: 100,
+    travelTime: '2h 0m',
+    isConference: true
+  });
+
+  const [showStaffModal, setShowStaffModal] = useState(false);
+  const [editingStaffId, setEditingStaffId] = useState(null);
+  const [staffFormData, setStaffFormData] = useState({
+    roleName: '',
+    rateType: 'hourly',
+    rateValue: 18,
+    defaultHours: 4
+  });
+
+  const [showTransportModal, setShowTransportModal] = useState(false);
+  const [editingTransportId, setEditingTransportId] = useState(null);
+  const [transportFormData, setTransportFormData] = useState({
+    modeName: '',
+    rateType: 'mileage',
+    rateValue: 3.50
+  });
+
+  const [budgetSubTab, setBudgetSubTab] = useState('summary');
+  const [selectedSportDetail, setSelectedSportDetail] = useState(null);
 
   // Form state for scheduling
   const [formData, setFormData] = useState({
@@ -430,35 +467,43 @@ export default function App() {
     e.preventDefault();
     const newId = 'v-' + Date.now();
     const venuePayload = { id: newId, ...venueFormData };
+    let updatedVenues;
+    
+    if (editingVenue) {
+      updatedVenues = venues.map(v => v.id === editingVenue.id ? { ...v, ...venueFormData } : v);
+    } else {
+      updatedVenues = [...venues, venuePayload];
+    }
+
+    setVenues(updatedVenues);
+    localStorage.setItem('app_venues', JSON.stringify(updatedVenues));
+
     try {
       const venuesRef = collection(db, 'artifacts', appId, 'public', 'data', 'venues');
       if (editingVenue) {
         await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'venues', editingVenue.id), venueFormData);
-        setVenues(venues.map(v => v.id === editingVenue.id ? { ...v, ...venueFormData } : v));
-        showNotice('Venue updated');
       } else {
         await addDoc(venuesRef, venuePayload);
-        setVenues([...venues, venuePayload]);
-        showNotice('Venue added');
       }
+      showNotice(editingVenue ? 'Venue updated' : 'Venue added');
     } catch (err) {
-      if (editingVenue) {
-        setVenues(venues.map(v => v.id === editingVenue.id ? { ...v, ...venueFormData } : v));
-      } else {
-        setVenues([...venues, venuePayload]);
-      }
       showNotice('Venue saved locally');
     }
+
     setShowVenueModal(false);
     setEditingVenue(null);
     setVenueFormData({ name: '', type: 'Outdoor Turf', capacity: 2000 });
   };
 
   const handleDeleteVenue = async (id) => {
+    const updatedVenues = venues.filter(v => v.id !== id);
+    setVenues(updatedVenues);
+    localStorage.setItem('app_venues', JSON.stringify(updatedVenues));
+
     try {
       await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'venues', id));
     } catch (e) {}
-    setVenues(venues.filter(v => v.id !== id));
+
     showNotice('Venue deleted');
   };
 
@@ -467,11 +512,16 @@ export default function App() {
     e.preventDefault();
     if (!sportFormData.name) return;
     const sportName = sportFormData.name;
+    const updatedConfigs = { ...sportConfigs, [sportName]: sportFormData };
+
+    setSportConfigs(updatedConfigs);
+    localStorage.setItem('app_sport_configs', JSON.stringify(updatedConfigs));
+
     try {
       const sportDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'sports', sportName.replace(/[^a-zA-Z0-9]/g, '_'));
       await setDoc(sportDocRef, sportFormData);
     } catch (err) {}
-    setSportConfigs({ ...sportConfigs, [sportName]: sportFormData });
+
     setShowSportModal(false);
     setEditingSportKey(null);
     showNotice(`Sport configuration for ${sportName} saved.`);
@@ -481,6 +531,13 @@ export default function App() {
     const updated = { ...sportConfigs };
     delete updated[key];
     setSportConfigs(updated);
+    localStorage.setItem('app_sport_configs', JSON.stringify(updated));
+
+    try {
+      const sportDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'sports', key.replace(/[^a-zA-Z0-9]/g, '_'));
+      await deleteDoc(sportDocRef);
+    } catch (e) {}
+
     showNotice('Sport removed from active configuration.');
   };
 
@@ -489,74 +546,101 @@ export default function App() {
     if (!newOpponentData.name) return;
     const newId = 'opp-' + Date.now();
     const oppPayload = { id: newId, ...newOpponentData };
+    let updatedOpponents;
+
+    if (editingOpponentId) {
+      updatedOpponents = opponents.map(o => o.id === editingOpponentId ? { ...o, ...newOpponentData } : o);
+    } else {
+      updatedOpponents = [...opponents, oppPayload];
+    }
+
+    setOpponents(updatedOpponents);
+    localStorage.setItem('app_opponents', JSON.stringify(updatedOpponents));
+
     try {
       const opponentsRef = collection(db, 'artifacts', appId, 'public', 'data', 'opponents');
       if (editingOpponentId) {
         await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'opponents', editingOpponentId), newOpponentData);
-        setOpponents(opponents.map(o => o.id === editingOpponentId ? { ...o, ...newOpponentData } : o));
-        showNotice('Opponent updated.');
       } else {
         await addDoc(opponentsRef, oppPayload);
-        setOpponents([...opponents, oppPayload]);
-        showNotice(`Opponent "${newOpponentData.name}" added.`);
       }
+      showNotice(editingOpponentId ? 'Opponent updated.' : `Opponent "${newOpponentData.name}" added.`);
     } catch (e) {
-      if (editingOpponentId) {
-        setOpponents(opponents.map(o => o.id === editingOpponentId ? { ...o, ...newOpponentData } : o));
-      } else {
-        setOpponents([...opponents, oppPayload]);
-      }
-      showNotice('Opponent saved.');
+      showNotice('Opponent saved locally.');
     }
+
     setShowOpponentModal(false);
     setEditingOpponentId(null);
     setNewOpponentData({ name: '', location: '', distance: 100, travelTime: '2h 0m', isConference: true });
   };
 
-  const handleDeleteOpponent = (id) => {
-    setOpponents(opponents.filter(o => o.id !== id));
+  const handleDeleteOpponent = async (id) => {
+    const updatedOpponents = opponents.filter(o => o.id !== id);
+    setOpponents(updatedOpponents);
+    localStorage.setItem('app_opponents', JSON.stringify(updatedOpponents));
+
+    try {
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'opponents', id));
+    } catch (e) {}
+
     showNotice('Opponent removed.');
   };
 
   const handleSaveStaffRole = (e) => {
     e.preventDefault();
     if (!staffFormData.roleName) return;
+    let updatedStaff;
+
     if (editingStaffId) {
-      setStaffRoles(staffRoles.map(sr => sr.id === editingStaffId ? { ...sr, ...staffFormData } : sr));
+      updatedStaff = staffRoles.map(sr => sr.id === editingStaffId ? { ...sr, ...staffFormData } : sr);
       showNotice('Staff role updated.');
     } else {
       const newRole = { id: 'sr-' + Date.now(), ...staffFormData };
-      setStaffRoles([...staffRoles, newRole]);
+      updatedStaff = [...staffRoles, newRole];
       showNotice('Staff role added.');
     }
+
+    setStaffRoles(updatedStaff);
+    localStorage.setItem('app_staff_roles', JSON.stringify(updatedStaff));
+
     setShowStaffModal(false);
     setEditingStaffId(null);
     setStaffFormData({ roleName: '', rateType: 'hourly', rateValue: 18, defaultHours: 4 });
   };
 
   const handleDeleteStaffRole = (id) => {
-    setStaffRoles(staffRoles.filter(sr => sr.id !== id));
+    const updatedStaff = staffRoles.filter(sr => sr.id !== id);
+    setStaffRoles(updatedStaff);
+    localStorage.setItem('app_staff_roles', JSON.stringify(updatedStaff));
     showNotice('Staff role removed.');
   };
 
   const handleSaveTransportMode = (e) => {
     e.preventDefault();
     if (!transportFormData.modeName) return;
+    let updatedTransport;
+
     if (editingTransportId) {
-      setTransportModes(transportModes.map(tm => tm.id === editingTransportId ? { ...tm, ...transportFormData } : tm));
+      updatedTransport = transportModes.map(tm => tm.id === editingTransportId ? { ...tm, ...transportFormData } : tm);
       showNotice('Transportation mode updated.');
     } else {
       const newMode = { id: 'tm-' + Date.now(), ...transportFormData };
-      setTransportModes([...transportModes, newMode]);
+      updatedTransport = [...transportModes, newMode];
       showNotice('Transportation mode added.');
     }
+
+    setTransportModes(updatedTransport);
+    localStorage.setItem('app_transport_modes', JSON.stringify(updatedTransport));
+
     setShowTransportModal(false);
     setEditingTransportId(null);
     setTransportFormData({ modeName: '', rateType: 'mileage', rateValue: 3.50 });
   };
 
   const handleDeleteTransportMode = (id) => {
-    setTransportModes(transportModes.filter(tm => tm.id !== id));
+    const updatedTransport = transportModes.filter(tm => tm.id !== id);
+    setTransportModes(updatedTransport);
+    localStorage.setItem('app_transport_modes', JSON.stringify(updatedTransport));
     showNotice('Transportation mode removed.');
   };
 
@@ -1087,7 +1171,7 @@ export default function App() {
           </button>
 
           <button onClick={() => setActiveTab('sports')} className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all ${activeTab === 'sports' ? (darkMode ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20' : 'bg-indigo-50 text-indigo-700 font-semibold border border-indigo-200') : (darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-700 hover:text-slate-900')}`}>
-            <Award className="w-4 h-4" />
+            <Trophy className="w-4 h-4" />
             <span>Sports Management</span>
           </button>
 
@@ -1536,17 +1620,15 @@ export default function App() {
 
           {activeTab === 'budget' && (
             <div className="space-y-6 max-w-5xl mx-auto">
-              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                <div>
-                  <h3 className={`text-base font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Budget, Staffing & Transportation Control</h3>
-                  <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'} mt-0.5`}>Comprehensive financial models, home staffing rates, student workers, and transportation options.</p>
-                </div>
-                <div className="flex bg-slate-900 border border-slate-800 p-1 rounded-xl text-xs flex-wrap gap-1">
-                  <button onClick={() => { setBudgetSubTab('summary'); setSelectedSportDetail(null); }} className={`px-3 py-1.5 rounded-lg font-medium transition-all ${budgetSubTab === 'summary' && !selectedSportDetail ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}>Sport Summary</button>
-                  <button onClick={() => setBudgetSubTab('staffing')} className={`px-3 py-1.5 rounded-lg font-medium transition-all ${budgetSubTab === 'staffing' ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}>Home Staffing</button>
-                  <button onClick={() => setBudgetSubTab('student-workers')} className={`px-3 py-1.5 rounded-lg font-medium transition-all ${budgetSubTab === 'student-workers' ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}>Student Workers</button>
-                  <button onClick={() => setBudgetSubTab('transport')} className={`px-3 py-1.5 rounded-lg font-medium transition-all ${budgetSubTab === 'transport' ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}>Transportation</button>
-                </div>
+              <div>
+                <h3 className={`text-base font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Budget, Staffing & Transportation Control</h3>
+                <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'} mt-0.5`}>Comprehensive financial models, home staffing rates, student workers, and transportation options.</p>
+              </div>
+              <div className="flex bg-slate-900 border border-slate-800 p-1 rounded-xl text-xs flex-wrap gap-1">
+                <button onClick={() => { setBudgetSubTab('summary'); setSelectedSportDetail(null); }} className={`px-3 py-1.5 rounded-lg font-medium transition-all ${budgetSubTab === 'summary' && !selectedSportDetail ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}>Sport Summary</button>
+                <button onClick={() => setBudgetSubTab('staffing')} className={`px-3 py-1.5 rounded-lg font-medium transition-all ${budgetSubTab === 'staffing' ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}>Home Staffing</button>
+                <button onClick={() => setBudgetSubTab('student-workers')} className={`px-3 py-1.5 rounded-lg font-medium transition-all ${budgetSubTab === 'student-workers' ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}>Student Workers</button>
+                <button onClick={() => setBudgetSubTab('transport')} className={`px-3 py-1.5 rounded-lg font-medium transition-all ${budgetSubTab === 'transport' ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}>Transportation</button>
               </div>
 
               {selectedSportDetail ? (
@@ -1749,192 +1831,6 @@ export default function App() {
                   </div>
                 </div>
               )}
-            </div>
-          )}
-
-          {activeTab === 'submit' && (
-            <div className={`max-w-3xl mx-auto ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-2xl p-6 shadow-xl space-y-6`}>
-              
-              {/* CSV Importer */}
-              <div className={`p-4 ${darkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'} border rounded-xl flex flex-col md:flex-row items-center justify-between gap-4`}>
-                <div>
-                  <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wide">Bulk CSV Schedule Importer</h4>
-                  <p className="text-[11px] text-slate-400 mt-0.5">Format: Sport, Opponent, LocationType, VenueName, Date (YYYY-MM-DD), Time, Notes</p>
-                </div>
-                <label className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold cursor-pointer shadow">
-                  Upload CSV File
-                  <input type="file" accept=".csv" onChange={handleCSVImport} className="hidden" />
-                </label>
-              </div>
-
-              <div>
-                <h3 className="text-base font-bold">
-                  {editingScheduleId ? 'Edit Schedule Event' : (role === 'admin' ? 'Administrative Master Schedule Entry' : `Submit Schedule for ${currentUserSport}`)}
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">Enter contest details below to evaluate venue availability and projected travel/hosting budgets.</p>
-              </div>
-
-              <form onSubmit={handleScheduleSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Sport</label>
-                    <select value={formData.sport} onChange={(e) => handleSportChange(e.target.value)} disabled={role === 'coach'} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
-                      {Object.keys(sportConfigs).map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Coach / Submitter</label>
-                    <input type="text" value={formData.coachName} onChange={(e) => setFormData({...formData, coachName: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Opponent</label>
-                    <div className="flex gap-2">
-                      <select value={formData.opponent} onChange={(e) => handleOpponentOrTripChange({ opponent: e.target.value })} className={`flex-1 ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
-                        <option value="">-- Select Opponent --</option>
-                        {opponents.map(o => <option key={o.id} value={o.name}>{o.name} ({o.isConference ? 'Conf' : 'Non-Conf'})</option>)}
-                      </select>
-                      <button type="button" onClick={() => { setEditingOpponentId(null); setNewOpponentData({ name: '', location: '', distance: 100, travelTime: '2h 0m', isConference: true }); setShowOpponentModal(true); }} className="px-3 py-2 bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 rounded-xl text-xs font-semibold">
-                        + New
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Location Type</label>
-                    <select value={formData.locationType} onChange={(e) => handleLocationTypeChange(e.target.value)} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
-                      <option value="Home">Home</option>
-                      <option value="Away">Away</option>
-                      <option value="Neutral">Neutral Site</option>
-                      <option value="Tournament">Tournament Hosting</option>
-                      <option value="Postseason">Tentative Postseason</option>
-                    </select>
-                  </div>
-                </div>
-
-                {formData.locationType === 'Neutral' && (
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Neutral Site / Location Name</label>
-                    <input type="text" value={formData.neutralLocationName} onChange={(e) => setFormData({...formData, neutralLocationName: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="e.g. Regional Championship Complex" />
-                  </div>
-                )}
-
-                {formData.locationType === 'Tournament' && (
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Tournament Details (Other Teams & Game Times)</label>
-                    <textarea rows="2" value={formData.tournamentDetails} onChange={(e) => setFormData({...formData, tournamentDetails: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="Game 2 vs Team B @ 7:00 PM, etc."></textarea>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {formData.locationType === 'Home' || formData.locationType === 'Tournament' ? (
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-400 mb-1">Assigned Venue</label>
-                      <select value={formData.venueId} onChange={(e) => setFormData({...formData, venueId: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
-                        {venues.map(v => <option key={v.id} value={v.id}>{v.name} ({v.type})</option>)}
-                      </select>
-                    </div>
-                  ) : (
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-400 mb-1">Destination</label>
-                      <input type="text" disabled value="Opponent Location" className={`w-full ${darkMode ? 'bg-slate-900/50 border-slate-800 text-slate-500' : 'bg-slate-100 border-slate-200 text-slate-400'} border rounded-xl px-3 py-2 text-sm`} />
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Date</label>
-                    <input type="date" required value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Start Time</label>
-                    <input type="time" required value={formData.time} onChange={(e) => setFormData({...formData, time: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                  </div>
-                </div>
-
-                <div className={`grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Duration (Hours)</label>
-                    <input type="number" step="0.5" value={formData.durationHours} onChange={(e) => setFormData({...formData, durationHours: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Warmup Buffer (Auto)</label>
-                    <input type="text" disabled value={`${(sportConfigs[formData.sport] || {}).warmupMinutes || 45} mins`} className={`w-full ${darkMode ? 'bg-slate-900/50 border-slate-800 text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-500'} border rounded-xl px-3 py-2 text-sm`} />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Teardown Buffer</label>
-                    <input type="text" disabled value={formData.locationType === 'Home' ? '0 mins (None)' : `${(sportConfigs[formData.sport] || {}).teardownMinutes || 30} mins`} className={`w-full ${darkMode ? 'bg-slate-900/50 border-slate-800 text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-500'} border rounded-xl px-3 py-2 text-sm`} />
-                  </div>
-                </div>
-
-                {formData.locationType === 'Away' && (
-                  <div className={`p-4 ${darkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'} border rounded-xl space-y-3`}>
-                    <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wide">Travel, Logistics & Projected Schedule</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-400 mb-1">Travel Party Size</label>
-                        <input type="number" value={formData.travelPartySize} onChange={(e) => handleOpponentOrTripChange({ travelPartySize: Number(e.target.value) })} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-400 mb-1">Travel Mode</label>
-                        <select value={formData.travelMode} onChange={(e) => handleOpponentOrTripChange({ travelMode: e.target.value })} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
-                          {transportModes.map(tm => <option key={tm.id} value={tm.modeName}>{tm.modeName}</option>)}
-                        </select>
-                      </div>
-                      <div className="flex items-center pt-5">
-                        <input type="checkbox" id="overnight" checked={formData.overnightTravel} onChange={(e) => handleOpponentOrTripChange({ overnightTravel: e.target.checked })} className="rounded text-indigo-600 w-4 h-4" />
-                        <label htmlFor="overnight" className="ml-2 text-xs font-medium">Overnight Trip (Hotel & Meals)</label>
-                      </div>
-                    </div>
-
-                    {formData.overnightTravel && (
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 pt-2 border-t border-slate-800">
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-400 mb-1">Hotel Rooms Count</label>
-                          <input type="number" value={formData.hotelRoomsCount} onChange={(e) => handleOpponentOrTripChange({ hotelRoomsCount: Number(e.target.value) })} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-400 mb-1">Cost Per Room / Night ($)</label>
-                          <input type="number" value={formData.customHotelCostPerNight} onChange={(e) => handleOpponentOrTripChange({ customHotelCostPerNight: Number(e.target.value) })} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-400 mb-1">Departure Date & Time</label>
-                          <input type="datetime-local" value={formData.departureDate} onChange={(e) => setFormData({...formData, departureDate: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-400 mb-1">Return Date & Time</label>
-                          <input type="datetime-local" value={formData.returnDate} onChange={(e) => setFormData({...formData, returnDate: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="pt-2 text-xs text-indigo-300 flex justify-between">
-                      <span>Projected Travel Expense: <strong>${formData.travelCost.toLocaleString()}</strong></span>
-                      <span>Projected Lodging: <strong>${formData.hotelCost.toLocaleString()}</strong></span>
-                      <span>Projected Meals: <strong>${formData.mealCost.toLocaleString()}</strong></span>
-                    </div>
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Notes / Special Requirements</label>
-                  <textarea rows="2" value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="Broadcast needs, equipment truck, etc."></textarea>
-                </div>
-
-                <div className="flex justify-end space-x-3 pt-4">
-                  {editingScheduleId && (
-                    <button type="button" onClick={() => { setEditingScheduleId(null); setActiveTab('dashboard'); }} className="px-4 py-2.5 bg-slate-800 text-slate-300 rounded-xl text-xs font-semibold">
-                      Cancel
-                    </button>
-                  )}
-                  <button type="submit" className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-lg">
-                    {editingScheduleId ? 'Update Schedule Event' : (role === 'admin' ? 'Save Master Schedule Event' : 'Submit Schedule for Review')}
-                  </button>
-                </div>
-              </form>
             </div>
           )}
 
