@@ -28,7 +28,7 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
-// --- INITIAL FALLBACK DATA REMOVED TO PREVENT OVERWRITING PRODUCTION DATA ---
+// --- INITIAL FALLBACK DATA COMPLETELY REMOVED TO PREVENT RE-INJECTING DELETED RECORDS ---
 const INITIAL_VENUES = [];
 const INITIAL_OPPONENTS = [];
 const INITIAL_SPORT_CONFIGS = {};
