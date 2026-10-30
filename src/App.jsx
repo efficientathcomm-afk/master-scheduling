@@ -72,9 +72,9 @@ const INITIAL_TRANSPORT_MODES = [
 ];
 
 const INITIAL_STAFF_MEMBERS = [
-  { id: 'st-1', name: 'Coach Marcus Vance', email: 'mvance@university.edu', role: 'coach', assignedSport: 'Football' },
-  { id: 'st-2', name: 'Director Sarah Jenkins', email: 'sjenkins@university.edu', role: 'admin', assignedSport: '' },
-  { id: 'st-3', name: 'Coach Dave Miller', email: 'dmiller@university.edu', role: 'coach', assignedSport: "Men's Basketball" }
+  { id: 'st-1', name: 'Coach Marcus Vance', email: 'mvance@university.edu', role: 'coach' },
+  { id: 'st-2', name: 'Director Sarah Jenkins', email: 'sjenkins@university.edu', role: 'admin' },
+  { id: 'st-3', name: 'Coach Dave Miller', email: 'dmiller@university.edu', role: 'coach' }
 ];
 
 const INITIAL_STUDENT_WORKER_SETTINGS = {
@@ -182,8 +182,7 @@ export default function App() {
   const [staffMemberFormData, setStaffMemberFormData] = useState({
     name: '',
     email: '',
-    role: 'coach',
-    assignedSport: 'Football'
+    role: 'coach'
   });
 
   const [showOpponentModal, setShowOpponentModal] = useState(false);
@@ -663,7 +662,7 @@ export default function App() {
 
     setShowStaffMemberModal(false);
     setEditingStaffMemberId(null);
-    setStaffMemberFormData({ name: '', email: '', role: 'coach', assignedSport: 'Football' });
+    setStaffMemberFormData({ name: '', email: '', role: 'coach' });
   };
 
   const handleDeleteStaffMember = async (id) => {
@@ -1291,22 +1290,12 @@ export default function App() {
                 <label className="block text-xs font-semibold text-slate-400 mb-1">Email Address</label>
                 <input type="email" required value={staffMemberFormData.email} onChange={(e) => setStaffMemberFormData({...staffMemberFormData, email: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="ajohnson@university.edu" />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Role</label>
-                  <select value={staffMemberFormData.role} onChange={(e) => setStaffMemberFormData({...staffMemberFormData, role: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
-                    <option value="coach">Coach</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                </div>
-                {staffMemberFormData.role === 'coach' && (
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Assigned Sport</label>
-                    <select value={staffMemberFormData.assignedSport} onChange={(e) => setStaffMemberFormData({...staffMemberFormData, assignedSport: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
-                      {Object.keys(sportConfigs).map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </div>
-                )}
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">Role</label>
+                <select value={staffMemberFormData.role} onChange={(e) => setStaffMemberFormData({...staffMemberFormData, role: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
+                  <option value="coach">Coach</option>
+                  <option value="admin">Admin</option>
+                </select>
               </div>
               <div className="flex justify-end space-x-3 pt-3">
                 <button type="button" onClick={() => setShowStaffMemberModal(false)} className="px-4 py-2 text-xs text-slate-400">Cancel</button>
@@ -1757,9 +1746,9 @@ export default function App() {
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className={`text-base font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Staff Management & Coaches Directory</h3>
-                  <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'} mt-0.5`}>Manage athletic staff and head coaches assigned to manage sport schedules.</p>
+                  <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'} mt-0.5`}>Manage athletic staff and coaches for schedule management and sports assignments.</p>
                 </div>
-                <button onClick={() => { setEditingStaffMemberId(null); setStaffMemberFormData({ name: '', email: '', role: 'coach', assignedSport: 'Football' }); setShowStaffMemberModal(true); }} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow">
+                <button onClick={() => { setEditingStaffMemberId(null); setStaffMemberFormData({ name: '', email: '', role: 'coach' }); setShowStaffMemberModal(true); }} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow">
                   <Plus className="w-4 h-4"/> Add Staff Member
                 </button>
               </div>
@@ -1772,7 +1761,6 @@ export default function App() {
                         <th className="pb-3 font-semibold">Name</th>
                         <th className="pb-3 font-semibold">Email</th>
                         <th className="pb-3 font-semibold">Role</th>
-                        <th className="pb-3 font-semibold">Assigned Sport</th>
                         <th className="pb-3 font-semibold text-right">Actions</th>
                       </tr>
                     </thead>
@@ -1786,9 +1774,8 @@ export default function App() {
                               {st.role.toUpperCase()}
                             </span>
                           </td>
-                          <td className="py-3 text-slate-400">{st.role === 'coach' ? (st.assignedSport || 'Unassigned') : 'N/A (Admin)'}</td>
                           <td className="py-3 text-right space-x-2">
-                            <button onClick={() => { setEditingStaffMemberId(st.id); setStaffMemberFormData({ name: st.name, email: st.email, role: st.role, assignedSport: st.assignedSport || 'Football' }); setShowStaffMemberModal(true); }} className={`px-2.5 py-1 ${darkMode ? 'bg-slate-900 text-slate-300' : 'bg-slate-200 text-slate-800 font-semibold'} rounded-lg`}>Edit</button>
+                            <button onClick={() => { setEditingStaffMemberId(st.id); setStaffMemberFormData({ name: st.name, email: st.email, role: st.role }); setShowStaffMemberModal(true); }} className={`px-2.5 py-1 ${darkMode ? 'bg-slate-900 text-slate-300' : 'bg-slate-200 text-slate-800 font-semibold'} rounded-lg`}>Edit</button>
                             <button onClick={() => handleDeleteStaffMember(st.id)} className="px-2.5 py-1 bg-rose-600/20 text-rose-400 rounded-lg">Remove</button>
                           </td>
                         </tr>
