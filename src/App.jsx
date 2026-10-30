@@ -28,79 +28,17 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
-// --- INITIAL FALLBACK DATA ---
-const INITIAL_VENUES = [
-  { id: 'v1', name: 'Alumni Memorial Stadium', type: 'Outdoor Turf', capacity: 5000 },
-  { id: 'v2', name: 'Main Arena (Gryphon Center)', type: 'Indoor Court', capacity: 3200 },
-  { id: 'v3', name: 'Varsity Soccer Pitch', type: 'Grass Field', capacity: 1500 },
-  { id: 'v4', name: 'Aquatics & Natatorium', type: 'Pool', capacity: 600 },
-  { id: 'v5', name: 'Baseball & Softball Diamond', type: 'Field', capacity: 1000 }
-];
-
-const INITIAL_SPORT_CONFIGS = {
-  'Football': { name: 'Football', defaultVenueId: 'v1', defaultDuration: 3.5, warmupMinutes: 90, arrivalBufferHours: 3, departureBufferHours: 1, teardownMinutes: 60, tier: 'Tier 1 (Revenue)', officialsCost: 2400, staffCost: 1100, rosterSize: 75, studentStaffCount: 12 },
-  'Men\'s Basketball': { name: "Men's Basketball", defaultVenueId: 'v2', defaultDuration: 2.5, warmupMinutes: 60, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 45, tier: 'Tier 1 (Revenue)', officialsCost: 1200, staffCost: 600, rosterSize: 15, studentStaffCount: 6 },
-  'Women\'s Basketball': { name: "Women's Basketball", defaultVenueId: 'v2', defaultDuration: 2.5, warmupMinutes: 60, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 45, tier: 'Tier 1 (Revenue)', officialsCost: 1200, staffCost: 600, rosterSize: 15, studentStaffCount: 6 },
-  'Men\'s Soccer': { name: "Men's Soccer", defaultVenueId: 'v3', defaultDuration: 2.0, warmupMinutes: 45, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 30, tier: 'Tier 2', officialsCost: 600, staffCost: 350, rosterSize: 24, studentStaffCount: 4 },
-  'Women\'s Soccer': { name: "Women's Soccer", defaultVenueId: 'v3', defaultDuration: 2.0, warmupMinutes: 45, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 30, tier: 'Tier 2', officialsCost: 600, staffCost: 350, rosterSize: 24, studentStaffCount: 4 },
-  'Volleyball': { name: 'Volleyball', defaultVenueId: 'v2', defaultDuration: 2.0, warmupMinutes: 45, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 30, tier: 'Tier 2', officialsCost: 500, staffCost: 300, rosterSize: 16, studentStaffCount: 4 },
-  'Baseball': { name: 'Baseball', defaultVenueId: 'v5', defaultDuration: 3.0, warmupMinutes: 60, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 45, tier: 'Tier 2', officialsCost: 800, staffCost: 400, rosterSize: 30, studentStaffCount: 5 },
-  'Softball': { name: 'Softball', defaultVenueId: 'v5', defaultDuration: 2.5, warmupMinutes: 45, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 30, tier: 'Tier 2', officialsCost: 700, staffCost: 350, rosterSize: 22, studentStaffCount: 4 },
-  'Lacrosse': { name: 'Lacrosse', defaultVenueId: 'v1', defaultDuration: 2.5, warmupMinutes: 45, arrivalBufferHours: 2, departureBufferHours: 1, teardownMinutes: 30, tier: 'Tier 3', officialsCost: 600, staffCost: 300, rosterSize: 30, studentStaffCount: 4 },
-  'Swimming': { name: 'Swimming', defaultVenueId: 'v4', defaultDuration: 2.5, warmupMinutes: 30, arrivalBufferHours: 1.5, departureBufferHours: 1, teardownMinutes: 30, tier: 'Tier 3', officialsCost: 400, staffCost: 250, rosterSize: 25, studentStaffCount: 4 }
-};
-
-const INITIAL_OPPONENTS = [
-  { id: 'opp-1', name: 'State Tech University', location: 'State Tech, PA', distance: 140, travelTime: '2h 15m', isConference: true },
-  { id: 'opp-2', name: 'Coastal College', location: 'Coastal, NC', distance: 450, travelTime: '7h 30m', isConference: false },
-  { id: 'opp-3', name: 'Metro State University', location: 'Metro, NY', distance: 80, travelTime: '1h 30m', isConference: true },
-  { id: 'opp-4', name: 'Northern Polytechnic', location: 'North, MA', distance: 620, travelTime: '10h 0m', isConference: false },
-  { id: 'opp-5', name: 'Cascade Valley College', location: 'Cascade, VT', distance: 210, travelTime: '3h 45m', isConference: true }
-];
-
-const INITIAL_STAFF_ROLES = [
-  { id: 'sr-1', roleName: 'Game Announcer / PA', rateType: 'hourly', rateValue: 25, defaultHours: 4 },
-  { id: 'sr-2', roleName: 'Livestream Operator', rateType: 'hourly', rateValue: 22, defaultHours: 4 },
-  { id: 'sr-3', roleName: 'Ticket Taker / Usher', rateType: 'flat', rateValue: 120, defaultHours: 3 },
-  { id: 'sr-4', roleName: 'Athletic Trainer', rateType: 'hourly', rateValue: 35, defaultHours: 5 }
-];
-
-const INITIAL_TRANSPORT_MODES = [
-  { id: 'tm-1', modeName: 'Charter Bus', rateType: 'mileage', rateValue: 4.50 },
-  { id: 'tm-2', modeName: 'Van Fleet', rateType: 'mileage', rateValue: 1.20 },
-  { id: 'tm-3', modeName: 'Commercial Flight', rateType: 'flat', rateValue: 450 }
-];
-
+// --- INITIAL FALLBACK DATA (ONLY USED WHEN EMPTY IN LOCAL STATE) ---
+const INITIAL_VENUES = [];
+const INITIAL_OPPONENTS = [];
+const INITIAL_SPORT_CONFIGS = {};
+const INITIAL_STAFF_ROLES = [];
+const INITIAL_TRANSPORT_MODES = [];
 const INITIAL_STUDENT_WORKER_SETTINGS = {
   hourlyRate: 15.00,
-  prepAndTeardownMinutes: 90 // 1.5 hours total added to game length
+  prepAndTeardownMinutes: 90
 };
-
-const INITIAL_SCHEDULES = [
-  {
-    id: 'sched-1',
-    sport: 'Football',
-    coachName: 'Coach Marcus Vance',
-    opponent: 'State Tech University',
-    locationType: 'Home',
-    venueId: 'v1',
-    venueName: 'Alumni Memorial Stadium',
-    date: '2026-09-12',
-    time: '14:00',
-    durationHours: 3.5,
-    warmupMinutes: 90,
-    teardownMinutes: 60,
-    travelCost: 0,
-    mealCost: 0,
-    hotelCost: 0,
-    hostingCost: 3500,
-    overnightTravel: false,
-    travelPartySize: 85,
-    travelMode: 'Charter Bus',
-    status: 'Approved',
-    notes: 'Season opener home game'
-  }
-];
+const INITIAL_SCHEDULES = [];
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -223,10 +161,9 @@ export default function App() {
       (snapshot) => {
         const loaded = [];
         snapshot.forEach(d => loaded.push({ id: d.id, ...d.data() }));
+        // Only set if items exist or keep current state if empty so we don't overwrite user deletions
         if (loaded.length > 0) {
           setSchedules(loaded);
-        } else {
-          setSchedules([]);
         }
         setSyncStatus('Synced');
       },
@@ -1755,186 +1692,219 @@ export default function App() {
           {activeTab === 'submit' && (
             <div className={`max-w-3xl mx-auto ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'} border rounded-2xl p-6 shadow-xl space-y-6`}>
               
-              {/* CSV Importer */}
-              <div className={`p-4 ${darkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'} border rounded-xl flex flex-col md:flex-row items-center justify-between gap-4`}>
-                <div>
-                  <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wide">Bulk CSV Schedule Importer</h4>
-                  <p className="text-[11px] text-slate-400 mt-0.5">Format: Sport, Opponent, LocationType, VenueName, Date (YYYY-MM-DD), Time, Notes</p>
-                </div>
-                <label className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold cursor-pointer shadow">
-                  Upload CSV File
-                  <input type="file" accept=".csv" onChange={handleCSVImport} className="hidden" />
-                </label>
-              </div>
-
-              <div>
-                <h3 className="text-base font-bold">
-                  {editingScheduleId ? 'Edit Schedule Event' : (role === 'admin' ? 'Administrative Master Schedule Entry' : `Submit Schedule for ${currentUserSport}`)}
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">Enter contest details below to evaluate venue availability and projected travel/hosting budgets.</p>
-              </div>
-
-              <form onSubmit={handleScheduleSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {!editingScheduleId && formData.locationType === '' ? (
+                <div className="space-y-6">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Sport</label>
-                    <select value={formData.sport} onChange={(e) => handleSportChange(e.target.value)} disabled={role === 'coach'} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
-                      {Object.keys(sportConfigs).map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
+                    <h3 className="text-base font-bold">Select Schedule Entry Method</h3>
+                    <p className="text-xs text-slate-400 mt-0.5">Choose how you would like to add your contest details below.</p>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Coach / Submitter</label>
-                    <input type="text" value={formData.coachName} onChange={(e) => setFormData({...formData, coachName: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <button onClick={() => setFormData(prev => ({ ...prev, locationType: 'Home' }))} className={`p-4 rounded-xl border text-left transition-all ${darkMode ? 'bg-slate-900 border-slate-800 hover:border-indigo-500' : 'bg-slate-50 border-slate-200 hover:border-indigo-500'}`}>
+                      <h4 className="text-sm font-bold text-indigo-400">Add Home Event</h4>
+                      <p className="text-xs text-slate-400 mt-1">Standard home contest at your assigned facility.</p>
+                    </button>
+
+                    <button onClick={() => setFormData(prev => ({ ...prev, locationType: 'Away' }))} className={`p-4 rounded-xl border text-left transition-all ${darkMode ? 'bg-slate-900 border-slate-800 hover:border-indigo-500' : 'bg-slate-50 border-slate-200 hover:border-indigo-500'}`}>
+                      <h4 className="text-sm font-bold text-indigo-400">Add Road Event</h4>
+                      <p className="text-xs text-slate-400 mt-1">Away contest with transportation and lodging calculations.</p>
+                    </button>
+
+                    <button onClick={() => setFormData(prev => ({ ...prev, locationType: 'Neutral' }))} className={`p-4 rounded-xl border text-left transition-all ${darkMode ? 'bg-slate-900 border-slate-800 hover:border-indigo-500' : 'bg-slate-50 border-slate-200 hover:border-indigo-500'}`}>
+                      <h4 className="text-sm font-bold text-indigo-400">Add Neutral Site Event</h4>
+                      <p className="text-xs text-slate-400 mt-1">Contest hosted at a neutral location.</p>
+                    </button>
+
+                    <button onClick={() => setFormData(prev => ({ ...prev, locationType: 'Tournament' }))} className={`p-4 rounded-xl border text-left transition-all ${darkMode ? 'bg-slate-900 border-slate-800 hover:border-indigo-500' : 'bg-slate-50 border-slate-200 hover:border-indigo-500'}`}>
+                      <h4 className="text-sm font-bold text-indigo-400">Add Home Tournament</h4>
+                      <p className="text-xs text-slate-400 mt-1">Multi-game tournament hosted on campus.</p>
+                    </button>
+
+                    <button onClick={() => setFormData(prev => ({ ...prev, locationType: 'AwayTournament' }))} className={`p-4 rounded-xl border text-left transition-all ${darkMode ? 'bg-slate-900 border-slate-800 hover:border-indigo-500' : 'bg-slate-50 border-slate-200 hover:border-indigo-500'}`}>
+                      <h4 className="text-sm font-bold text-indigo-400">Add Road Tournament</h4>
+                      <p className="text-xs text-slate-400 mt-1">Away multi-game tournament trip.</p>
+                    </button>
+
+                    <label className={`p-4 rounded-xl border text-left cursor-pointer transition-all ${darkMode ? 'bg-slate-900 border-slate-800 hover:border-indigo-500' : 'bg-slate-50 border-slate-200 hover:border-indigo-500'}`}>
+                      <h4 className="text-sm font-bold text-indigo-400">Import from CSV</h4>
+                      <p className="text-xs text-slate-400 mt-1">Bulk upload conference schedules via CSV file.</p>
+                      <input type="file" accept=".csv" onChange={handleCSVImport} className="hidden" />
+                    </label>
                   </div>
                 </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Opponent</label>
-                    <div className="flex gap-2">
-                      <select value={formData.opponent} onChange={(e) => handleOpponentOrTripChange({ opponent: e.target.value })} className={`flex-1 ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
-                        <option value="">-- Select Opponent --</option>
-                        {opponents.map(o => <option key={o.id} value={o.name}>{o.name} ({o.isConference ? 'Conf' : 'Non-Conf'})</option>)}
-                      </select>
-                      <button type="button" onClick={() => { setEditingOpponentId(null); setNewOpponentData({ name: '', location: '', distance: 100, travelTime: '2h 0m', isConference: true }); setShowOpponentModal(true); }} className="px-3 py-2 bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 rounded-xl text-xs font-semibold">
-                        + New
+              ) : (
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-base font-bold">
+                        {editingScheduleId ? 'Edit Schedule Event' : `New ${formData.locationType} Event`}
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-0.5">Enter contest details below.</p>
+                    </div>
+                    {!editingScheduleId && (
+                      <button type="button" onClick={() => setFormData(prev => ({ ...prev, locationType: '' }))} className="text-xs text-indigo-400 hover:underline">
+                        &larr; Back to Actions
                       </button>
-                    </div>
+                    )}
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Location Type</label>
-                    <select value={formData.locationType} onChange={(e) => handleLocationTypeChange(e.target.value)} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
-                      <option value="Home">Home</option>
-                      <option value="Away">Away</option>
-                      <option value="Neutral">Neutral Site</option>
-                      <option value="Tournament">Tournament Hosting</option>
-                      <option value="Postseason">Tentative Postseason</option>
-                    </select>
-                  </div>
-                </div>
-
-                {formData.locationType === 'Neutral' && (
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Neutral Site / Location Name</label>
-                    <input type="text" value={formData.neutralLocationName} onChange={(e) => setFormData({...formData, neutralLocationName: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="e.g. Regional Championship Complex" />
-                  </div>
-                )}
-
-                {formData.locationType === 'Tournament' && (
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Tournament Details (Other Teams & Game Times)</label>
-                    <textarea rows="2" value={formData.tournamentDetails} onChange={(e) => setFormData({...formData, tournamentDetails: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="Game 2 vs Team B @ 7:00 PM, etc."></textarea>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {formData.locationType === 'Home' || formData.locationType === 'Tournament' ? (
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-400 mb-1">Assigned Venue</label>
-                      <select value={formData.venueId} onChange={(e) => setFormData({...formData, venueId: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
-                        {venues.map(v => <option key={v.id} value={v.id}>{v.name} ({v.type})</option>)}
-                      </select>
-                    </div>
-                  ) : (
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-400 mb-1">Destination</label>
-                      <input type="text" disabled value="Opponent Location" className={`w-full ${darkMode ? 'bg-slate-900/50 border-slate-800 text-slate-500' : 'bg-slate-100 border-slate-200 text-slate-400'} border rounded-xl px-3 py-2 text-sm`} />
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Date</label>
-                    <input type="date" required value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Start Time</label>
-                    <input type="time" required value={formData.time} onChange={(e) => setFormData({...formData, time: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                  </div>
-                </div>
-
-                <div className={`grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Duration (Hours)</label>
-                    <input type="number" step="0.5" value={formData.durationHours} onChange={(e) => setFormData({...formData, durationHours: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Warmup Buffer (Auto)</label>
-                    <input type="text" disabled value={`${(sportConfigs[formData.sport] || {}).warmupMinutes || 45} mins`} className={`w-full ${darkMode ? 'bg-slate-900/50 border-slate-800 text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-500'} border rounded-xl px-3 py-2 text-sm`} />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Teardown Buffer</label>
-                    <input type="text" disabled value={formData.locationType === 'Home' ? '0 mins (None)' : `${(sportConfigs[formData.sport] || {}).teardownMinutes || 30} mins`} className={`w-full ${darkMode ? 'bg-slate-900/50 border-slate-800 text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-500'} border rounded-xl px-3 py-2 text-sm`} />
-                  </div>
-                </div>
-
-                {formData.locationType === 'Away' && (
-                  <div className={`p-4 ${darkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'} border rounded-xl space-y-3`}>
-                    <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wide">Travel, Logistics & Projected Schedule</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <form onSubmit={handleScheduleSubmit} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-xs font-semibold text-slate-400 mb-1">Travel Party Size</label>
-                        <input type="number" value={formData.travelPartySize} onChange={(e) => handleOpponentOrTripChange({ travelPartySize: Number(e.target.value) })} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-400 mb-1">Travel Mode</label>
-                        <select value={formData.travelMode} onChange={(e) => handleOpponentOrTripChange({ travelMode: e.target.value })} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
-                          {transportModes.map(tm => <option key={tm.id} value={tm.modeName}>{tm.modeName}</option>)}
+                        <label className="block text-xs font-semibold text-slate-400 mb-1">Sport</label>
+                        <select value={formData.sport} onChange={(e) => handleSportChange(e.target.value)} disabled={role === 'coach'} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
+                          {Object.keys(sportConfigs).map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
                       </div>
-                      <div className="flex items-center pt-5">
-                        <input type="checkbox" id="overnight" checked={formData.overnightTravel} onChange={(e) => handleOpponentOrTripChange({ overnightTravel: e.target.checked })} className="rounded text-indigo-600 w-4 h-4" />
-                        <label htmlFor="overnight" className="ml-2 text-xs font-medium">Overnight Trip (Hotel & Meals)</label>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 mb-1">Coach / Submitter</label>
+                        <input type="text" value={formData.coachName} onChange={(e) => setFormData({...formData, coachName: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
                       </div>
                     </div>
 
-                    {formData.overnightTravel && (
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 pt-2 border-t border-slate-800">
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-400 mb-1">Hotel Rooms Count</label>
-                          <input type="number" value={formData.hotelRoomsCount} onChange={(e) => handleOpponentOrTripChange({ hotelRoomsCount: Number(e.target.value) })} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 mb-1">Opponent</label>
+                        <div className="flex gap-2">
+                          <select value={formData.opponent} onChange={(e) => handleOpponentOrTripChange({ opponent: e.target.value })} className={`flex-1 ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
+                            <option value="">-- Select Opponent --</option>
+                            {opponents.map(o => <option key={o.id} value={o.name}>{o.name} ({o.isConference ? 'Conf' : 'Non-Conf'})</option>)}
+                          </select>
+                          <button type="button" onClick={() => { setEditingOpponentId(null); setNewOpponentData({ name: '', location: '', distance: 100, travelTime: '2h 0m', isConference: true }); setShowOpponentModal(true); }} className="px-3 py-2 bg-indigo-600/25 border border-indigo-500/30 text-indigo-400 rounded-xl text-xs font-semibold">
+                            + New
+                          </button>
                         </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 mb-1">Location Type</label>
+                        <input type="text" disabled value={formData.locationType} className={`w-full ${darkMode ? 'bg-slate-900/50 border-slate-800 text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-600'} border rounded-xl px-3 py-2 text-sm`} />
+                      </div>
+                    </div>
+
+                    {formData.locationType === 'Neutral' && (
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 mb-1">Neutral Site / Location Name</label>
+                        <input type="text" value={formData.neutralLocationName} onChange={(e) => setFormData({...formData, neutralLocationName: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="e.g. Regional Championship Complex" />
+                      </div>
+                    )}
+
+                    {(formData.locationType === 'Tournament' || formData.locationType === 'AwayTournament') && (
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 mb-1">Tournament Details (Other Teams & Game Times)</label>
+                        <textarea rows="2" value={formData.tournamentDetails} onChange={(e) => setFormData({...formData, tournamentDetails: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="Game 2 vs Team B @ 7:00 PM, etc."></textarea>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {formData.locationType === 'Home' || formData.locationType === 'Tournament' ? (
                         <div>
-                          <label className="block text-xs font-semibold text-slate-400 mb-1">Cost Per Room / Night ($)</label>
-                          <input type="number" value={formData.customHotelCostPerNight} onChange={(e) => handleOpponentOrTripChange({ customHotelCostPerNight: Number(e.target.value) })} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                          <label className="block text-xs font-semibold text-slate-400 mb-1">Assigned Venue</label>
+                          <select value={formData.venueId} onChange={(e) => setFormData({...formData, venueId: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
+                            {venues.map(v => <option key={v.id} value={v.id}>{v.name} ({v.type})</option>)}
+                          </select>
                         </div>
+                      ) : (
                         <div>
-                          <label className="block text-xs font-semibold text-slate-400 mb-1">Departure Date & Time</label>
-                          <input type="datetime-local" value={formData.departureDate} onChange={(e) => setFormData({...formData, departureDate: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                          <label className="block text-xs font-semibold text-slate-400 mb-1">Destination</label>
+                          <input type="text" disabled value="Opponent Location" className={`w-full ${darkMode ? 'bg-slate-900/50 border-slate-800 text-slate-500' : 'bg-slate-100 border-slate-200 text-slate-400'} border rounded-xl px-3 py-2 text-sm`} />
                         </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-400 mb-1">Return Date & Time</label>
-                          <input type="datetime-local" value={formData.returnDate} onChange={(e) => setFormData({...formData, returnDate: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                      )}
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 mb-1">Date</label>
+                        <input type="date" required value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 mb-1">Start Time</label>
+                        <input type="time" required value={formData.time} onChange={(e) => setFormData({...formData, time: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                      </div>
+                    </div>
+
+                    <div className={`grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 mb-1">Duration (Hours)</label>
+                        <input type="number" step="0.5" value={formData.durationHours} onChange={(e) => setFormData({...formData, durationHours: Number(e.target.value)})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 mb-1">Warmup Buffer (Auto)</label>
+                        <input type="text" disabled value={`${(sportConfigs[formData.sport] || {}).warmupMinutes || 45} mins`} className={`w-full ${darkMode ? 'bg-slate-900/50 border-slate-800 text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-500'} border rounded-xl px-3 py-2 text-sm`} />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 mb-1">Teardown Buffer</label>
+                        <input type="text" disabled value={formData.locationType === 'Home' ? '0 mins (None)' : `${(sportConfigs[formData.sport] || {}).teardownMinutes || 30} mins`} className={`w-full ${darkMode ? 'bg-slate-900/50 border-slate-800 text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-500'} border rounded-xl px-3 py-2 text-sm`} />
+                      </div>
+                    </div>
+
+                    {(formData.locationType === 'Away' || formData.locationType === 'AwayTournament') && (
+                      <div className={`p-4 ${darkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'} border rounded-xl space-y-3`}>
+                        <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wide">Travel, Logistics & Projected Schedule</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-400 mb-1">Travel Party Size</label>
+                            <input type="number" value={formData.travelPartySize} onChange={(e) => handleOpponentOrTripChange({ travelPartySize: Number(e.target.value) })} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-400 mb-1">Travel Mode</label>
+                            <select value={formData.travelMode} onChange={(e) => handleOpponentOrTripChange({ travelMode: e.target.value })} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`}>
+                              {transportModes.map(tm => <option key={tm.id} value={tm.modeName}>{tm.modeName}</option>)}
+                            </select>
+                          </div>
+                          <div className="flex items-center pt-5">
+                            <input type="checkbox" id="overnight" checked={formData.overnightTravel} onChange={(e) => handleOpponentOrTripChange({ overnightTravel: e.target.checked })} className="rounded text-indigo-600 w-4 h-4" />
+                            <label htmlFor="overnight" className="ml-2 text-xs font-medium">Overnight Trip (Hotel & Meals)</label>
+                          </div>
+                        </div>
+
+                        {formData.overnightTravel && (
+                          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 pt-2 border-t border-slate-800">
+                            <div>
+                              <label className="block text-xs font-semibold text-slate-400 mb-1">Hotel Rooms Count</label>
+                              <input type="number" value={formData.hotelRoomsCount} onChange={(e) => handleOpponentOrTripChange({ hotelRoomsCount: Number(e.target.value) })} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold text-slate-400 mb-1">Cost Per Room / Night ($)</label>
+                              <input type="number" value={formData.customHotelCostPerNight} onChange={(e) => handleOpponentOrTripChange({ customHotelCostPerNight: Number(e.target.value) })} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold text-slate-400 mb-1">Departure Date & Time</label>
+                              <input type="datetime-local" value={formData.departureDate} onChange={(e) => setFormData({...formData, departureDate: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold text-slate-400 mb-1">Return Date & Time</label>
+                              <input type="datetime-local" value={formData.returnDate} onChange={(e) => setFormData({...formData, returnDate: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} />
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="pt-2 text-xs text-indigo-300 flex justify-between">
+                          <span>Projected Travel Expense: <strong>${formData.travelCost.toLocaleString()}</strong></span>
+                          <span>Projected Lodging: <strong>${formData.hotelCost.toLocaleString()}</strong></span>
+                          <span>Projected Meals: <strong>${formData.mealCost.toLocaleString()}</strong></span>
                         </div>
                       </div>
                     )}
 
-                    <div className="pt-2 text-xs text-indigo-300 flex justify-between">
-                      <span>Projected Travel Expense: <strong>${formData.travelCost.toLocaleString()}</strong></span>
-                      <span>Projected Lodging: <strong>${formData.hotelCost.toLocaleString()}</strong></span>
-                      <span>Projected Meals: <strong>${formData.mealCost.toLocaleString()}</strong></span>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1">Notes / Special Requirements</label>
+                      <textarea rows="2" value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="Broadcast needs, equipment truck, etc."></textarea>
                     </div>
-                  </div>
-                )}
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Notes / Special Requirements</label>
-                  <textarea rows="2" value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} className={`w-full ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'} border rounded-xl px-3 py-2 text-sm`} placeholder="Broadcast needs, equipment truck, etc."></textarea>
+                    <div className="flex justify-end space-x-3 pt-4">
+                      {editingScheduleId && (
+                        <button type="button" onClick={() => { setEditingScheduleId(null); setActiveTab('dashboard'); }} className="px-4 py-2.5 bg-slate-800 text-slate-300 rounded-xl text-xs font-semibold">
+                          Cancel
+                        </button>
+                      )}
+                      <button type="submit" className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-lg">
+                        {editingScheduleId ? 'Update Schedule Event' : (role === 'admin' ? 'Save Master Schedule Event' : 'Submit Schedule for Review')}
+                      </button>
+                    </div>
+                  </form>
                 </div>
-
-                <div className="flex justify-end space-x-3 pt-4">
-                  {editingScheduleId && (
-                    <button type="button" onClick={() => { setEditingScheduleId(null); setActiveTab('dashboard'); }} className="px-4 py-2.5 bg-slate-800 text-slate-300 rounded-xl text-xs font-semibold">
-                      Cancel
-                    </button>
-                  )}
-                  <button type="submit" className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-lg">
-                    {editingScheduleId ? 'Update Schedule Event' : (role === 'admin' ? 'Save Master Schedule Event' : 'Submit Schedule for Review')}
-                  </button>
-                </div>
-              </form>
+              )}
             </div>
           )}
 
