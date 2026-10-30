@@ -28,7 +28,7 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
-// --- INITIAL FALLBACK DATA (ONLY USED WHEN EMPTY IN LOCAL STATE) ---
+// --- INITIAL FALLBACK DATA REMOVED TO PREVENT OVERWRITING PRODUCTION DATA ---
 const INITIAL_VENUES = [];
 const INITIAL_OPPONENTS = [];
 const INITIAL_SPORT_CONFIGS = {};
@@ -161,10 +161,7 @@ export default function App() {
       (snapshot) => {
         const loaded = [];
         snapshot.forEach(d => loaded.push({ id: d.id, ...d.data() }));
-        // Only set if items exist or keep current state if empty so we don't overwrite user deletions
-        if (loaded.length > 0) {
-          setSchedules(loaded);
-        }
+        setSchedules(loaded);
         setSyncStatus('Synced');
       },
       (err) => { setSyncStatus('Sync Error: ' + err.message); }
@@ -174,7 +171,7 @@ export default function App() {
       (snapshot) => {
         const loaded = [];
         snapshot.forEach(d => loaded.push({ id: d.id, ...d.data() }));
-        if (loaded.length > 0) setOpponents(loaded);
+        setOpponents(loaded);
       },
       (err) => {}
     );
@@ -195,9 +192,7 @@ export default function App() {
           const dat = d.data();
           if (dat.name) loadedObj[dat.name] = dat;
         });
-        if (Object.keys(loadedObj).length > 0) {
-          setSportConfigs(loadedObj);
-        }
+        setSportConfigs(loadedObj);
       },
       (err) => {}
     );
